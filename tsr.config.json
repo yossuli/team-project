@@ -1,4 +1,4 @@
 {
-  "routesDirectory": "./app/tanstackRoutes",
-  "generatedRouteTree": "./app/routeTree.gen.ts"
+  "routesDirectory": "./client/routes",
+  "generatedRouteTree": "./client/routeTree.gen.ts"
 }

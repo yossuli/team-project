@@ -40,3 +40,8 @@ wrangler.jsonc
 ## Panda
 **/styled-system
 **/styled-system-studio
+
+## auto-generated
+app/.assets-css.ts
+client/.hc.type.ts
+client/routeTree.gen.ts

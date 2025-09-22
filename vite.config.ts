@@ -12,11 +12,10 @@ export default defineConfig(({ mode }) => {
       plugins: [viteReact(), TanStackRouterVite({}), tsconfigPaths()],
       build: {
         rollupOptions: {
-          input: ["./app/client.tsx"],
+          input: ["./client/index.tsx"],
           output: {
             entryFileNames: "static/client.js",
           },
-          external: ["cloudflare:workers"],
         },
       },
     };
@@ -29,11 +28,13 @@ export default defineConfig(({ mode }) => {
         "@hono/clerk-auth",
         "@prisma/client",
         "@prisma/adapter-d1",
-        "cloudflare:workers",
       ],
     },
     plugins: [
       honox({
+        client: {
+          input: ["./client/index.tsx"],
+        },
         devServer: {
           adapter,
           entry: "app/index.tsx",
@@ -42,8 +43,9 @@ export default defineConfig(({ mode }) => {
             /^\/app\/.+\.tsx?/,
             /^\/favicon.ico/,
             /^\/static\/.+/,
-            /^\/app\/styled-system\/.+\.mjs?/,
+            /^\/styled-system\/.+\.mjs?/,
           ],
+
         },
       }),
       pages({
@@ -53,12 +55,6 @@ export default defineConfig(({ mode }) => {
     ],
     test: {
       include: ["./app/{utils/**/*.ts,**/*.test.ts,types/**/*.ts}"],
-    },
-    alias: {},
-    build: {
-      rollupOptions: {
-        external: ["cloudflare:workers"],
-      },
     },
   };
 });

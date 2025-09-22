@@ -1,8 +1,9 @@
+import { generateHcType } from "cmd/generateHcType";
 import { type Env, Hono } from "hono";
 import { showRoutes } from "hono/dev";
 import { createApp } from "honox/server";
 import { renderToString } from "react-dom/server";
-import { generateHcType } from "./utils/generateHcType";
+import { href } from "./.assets-css";
 
 const base = new Hono<Env>();
 
@@ -24,10 +25,10 @@ base.get("*", async (c, next) => {
           {import.meta.env.PROD ? (
             <>
               <script type="module" src="/static/client.js" />
-              <link rel="stylesheet" href="./static/styled-system/styles.css" />
+              <link rel="stylesheet" href={href} />
             </>
           ) : (
-            <script type="module" src="/app/client.tsx" />
+            <script type="module" src="/client/index.tsx" />
           )}
         </head>
         <body>
@@ -41,6 +42,6 @@ base.get("*", async (c, next) => {
 const app = createApp({ app: base });
 showRoutes(app);
 
-generateHcType(app);
+generateHcType(app, "../client/.hc.type.ts");
 
 export default app;

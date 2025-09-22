@@ -2,7 +2,7 @@ import { defineConfig } from "@pandacss/dev";
 
 export default defineConfig({
   strictPropertyValues: true,
-  include: ["./app/**/*.{js,jsx,ts,tsx}"],
+  include: ["./client/**/*.{js,jsx,ts,tsx}"],
   exclude: [],
   globalCss: {
     "h1, h2, h3, h4, h5, h6": {
@@ -41,7 +41,7 @@ export default defineConfig({
       width: "100%",
     },
   },
-  outdir: "./app/styled-system",
+  outdir: "./styled-system",
   importMap: {
     css: "@ss/css",
     jsx: "@ss/jsx",

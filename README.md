@@ -1,8 +1,8 @@
 ```txt
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ```txt
-npm run deploy
+pnpm deploy
 ```
