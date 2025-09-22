@@ -1,0 +1,133 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.2.2/schema.json",
+  "extends": [],
+  "files": { "ignoreUnknown": true },
+  "organizeImports": {
+    "enabled": true
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "ignore": [],
+    "indentWidth": 2,
+    "indentStyle": "space",
+    "lineWidth": 80
+  },
+  "json": {
+    "parser": { "allowComments": true },
+    "formatter": {
+      "enabled": true,
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "lineWidth": 80
+    }
+  },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "ignore": ["app/.hc.type.ts"],
+    "rules": {
+      "recommended": true,
+      "a11y": {
+        "useAltText": "warn",
+        "useValidAriaProps": "error",
+        "useValidAriaValues": "warn",
+        "useValidLang": "warn"
+      },
+      "complexity": {
+        "noBannedTypes": "warn",
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": {
+            "maxAllowedComplexity": 5
+          }
+        },
+        "noForEach": "off",
+        "useArrowFunction": { "level": "error", "fix": "safe" },
+        "useFlatMap": "off",
+        "useSimplifiedLogicExpression": "error"
+      },
+      "correctness": {
+        "noUndeclaredVariables": "off",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn",
+        "useArrayLiterals": "error",
+        "useHookAtTopLevel": "error",
+        "useImportExtensions": "off"
+      },
+      "performance": {
+        "noDelete": "error",
+        "noAccumulatingSpread": "warn"
+      },
+      "security": {},
+      "style": {
+        "noDefaultExport": "off",
+        "noNegationElse": "warn",
+        "noYodaExpression": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useAsConstAssertion": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useBlockStatements": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useConst": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useExportType": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useImportType": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useNamingConvention": "off",
+        "useSelfClosingElements": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useShorthandArrayType": "error"
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noConsoleLog": "warn",
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "warn"
+      },
+      "nursery": {
+        "noDuplicateElseIf": "error",
+        "noIrregularWhitespace": "error",
+        "noTemplateCurlyInString": "warn",
+        "useAtIndex": "info",
+        "useCollapsedIf": "info",
+        "useConsistentCurlyBraces": {
+          "level": "error",
+          "fix": "safe"
+        },
+        "useComponentExportOnlyModules": {
+          "level": "error",
+          "options": {
+            "allowConstantExport": true
+          }
+        }
+      }
+    }
+  }
+}

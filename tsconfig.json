@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["@cloudflare/workers-types", "vite/client", "vitest/importMeta"],
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "jsxImportSource": "react",
+    "paths": {
+      "@ss/*": ["./app/styled-system/*"]
+    }
+  }
+}
