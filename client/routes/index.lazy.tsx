@@ -11,6 +11,9 @@ export const Route = createLazyRoute("/")({
       <Flex direction="column">
         <h1>hoge</h1>
         <div>fuga</div>
+        <form action="api/test" method="post">
+          <button type="submit">test</button>
+        </form>
       </Flex>
     );
   },

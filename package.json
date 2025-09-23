@@ -1,5 +1,5 @@
 {
-  "name": "game1",
+  "name": "team-project",
   "type": "module",
   "scripts": {
     "notios": "notios dev",
@@ -8,11 +8,11 @@
     "dev:routes": "tsr watch",
     "dev:panda": "panda --watch",
     "build": "vite build --mode client && echo \"export const href = '$(ls dist/assets/*.css | sed 's/dist//')';\" > app/.assets-css.ts && vite build",
-    "migrate": "prisma migrate diff --from-local-d1 --to-schema-datamodel ./prisma/schema.prisma --script --output migrations/$(printf '%04d' $(($(ls migrations | wc -l) + 1)))_$(date +%Y%m%d%H%M%S).sql",
-    "migration:dev": "wrangler d1 migrations apply game1-db --local",
-    "migration:prod": "wrangler d1 migrations apply game1-db --remote",
-    "generate": "prisma generate",
-    "studio": "DATABASE_URL=file:../$(find .wrangler/state/v3/d1/miniflare-D1DatabaseObject -type f -name '*.sqlite' -print -quit) prisma studio",
+    "migration": "prisma migrate diff --from-local-d1 --to-schema-datamodel ./app/prisma/schema.prisma --script --output app/prisma/migrations/$(printf '%04d' $(($(ls app/prisma/migrations | wc -l) + 1)))_$(date +%Y%m%d%H%M%S).sql",
+    "migrate:dev": "wrangler d1 migrations apply team-project-db --local",
+    "migrate:prod": "wrangler d1 migrations apply team-project-db --remote",
+    "generate": "prisma generate --schema=./app/prisma/schema.prisma",
+    "studio": "DATABASE_URL=\"file:$(realpath $(find .wrangler/state/v3/d1/miniflare-D1DatabaseObject -type f -name '*.sqlite' -print -quit))\" prisma studio --schema=./app/prisma/schema.prisma",
     "format": "biome format ./app",
     "format:fix": "biome format --write ./app",
     "format:error": "biome format --diagnostic-level=error ./app",
