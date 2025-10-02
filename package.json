@@ -43,6 +43,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@ark-ui/react": "^5.25.0",
     "@biomejs/biome": "1.9.4",
     "@cloudflare/workers-types": "^4.20241218.0",
     "@hono/vite-build": "^1.2.0",
@@ -50,6 +51,7 @@
     "@hono/vite-dev-server": "^0.18.1",
     "@pandacss/dev": "^0.53.0",
     "@pandacss/studio": "^0.53.1",
+    "@park-ui/panda-preset": "^0.43.1",
     "@tanstack/router-cli": "^1.109.2",
     "@tanstack/router-plugin": "^1.109.2",
     "@types/node": "^22.13.5",
