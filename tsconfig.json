@@ -10,7 +10,8 @@
     "baseUrl": ".",
     "jsxImportSource": "react",
     "paths": {
-      "@ss/*": ["./styled-system/*"]
+      "@ss/*": ["./styled-system/*"],
+      "~/*": ["./*"]
     }
   }
 }
