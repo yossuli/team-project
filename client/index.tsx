@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { router } from "./route";
 import "@ss/styles.css";
+import { jaJP } from "@clerk/localizations";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -20,6 +21,7 @@ if (rootElement) {
     <StrictMode>
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
+        localization={jaJP}
         appearance={{
           variables: {
             colorPrimary: "black",
