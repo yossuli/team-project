@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "team-project",
+  "compatibility_date": "2025-09-22",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "team-project-db",
+      "database_id": "5cc5ea2b-ea3c-40d8-b86d-9ac16a7062f4",
+      "migrations_dir": "./app/prisma/migrations"
+    }
+  ]
+}
