@@ -18,10 +18,26 @@ if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <StrictMode>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <ClerkProvider
+        publishableKey={PUBLISHABLE_KEY}
+        appearance={{
+          variables: {
+            colorPrimary: "black",
+            colorTextOnPrimaryBackground: "white",
+            colorText: "black",
+            colorInputBackground: "#f9f9f9",
+            borderRadius: "0.5rem",
+          },
+          elements: {
+            logoBox: {
+              display: "none",
+            },
+          },
+        }}
+      >
         <RouterProvider router={router} />
         {import.meta.env.DEV && <TanStackRouterDevtools router={router} />}
       </ClerkProvider>
-    </StrictMode>,
+    </StrictMode>
   );
 }
