@@ -18,7 +18,6 @@ function RootComponent() {
   return (
     <>
       <Container flexDirection="column">
-        <header>
           <Flex>
             <SignedOut>
               <SignInButton>signin</SignInButton>
@@ -26,10 +25,9 @@ function RootComponent() {
             <SignedIn>
               {user.user?.username}
               <UserButton />
+              <Outlet />
             </SignedIn>
           </Flex>
-        </header>
-        <Outlet />
       </Container>
     </>
   );
