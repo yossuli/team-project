@@ -45,7 +45,6 @@ export default defineConfig(({ mode }) => {
             /^\/static\/.+/,
             /^\/styled-system\/.+\.mjs?/,
           ],
-
         },
       }),
       pages({
