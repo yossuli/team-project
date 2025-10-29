@@ -18,16 +18,18 @@ function RootComponent() {
   return (
     <>
       <Container flexDirection="column">
-        <SignedOut>
-          <SignInButton>signin</SignInButton>
-        </SignedOut>
-        <SignedIn>
+        <header>
           <Flex>
-            {user.user?.username}
-            <UserButton />
+            <SignedOut>
+              <SignInButton>signin</SignInButton>
+            </SignedOut>
+            <SignedIn>
+              {user.user?.username}
+              <UserButton />
+            </SignedIn>
           </Flex>
-          <Outlet />
-        </SignedIn>
+        </header>
+        <Outlet />
       </Container>
     </>
   );
