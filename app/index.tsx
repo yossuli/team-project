@@ -3,6 +3,7 @@ import { type Env, Hono } from "hono";
 import { showRoutes } from "hono/dev";
 import { createApp } from "honox/server";
 import { renderToString } from "react-dom/server";
+
 import { href } from "./.assets-css";
 
 const base = new Hono<Env>();
@@ -18,10 +19,6 @@ base.get("*", async (c, next) => {
         <head>
           <meta charSet="utf-8" />
           <meta content="width=device-width, initial-scale=1" name="viewport" />
-          <link
-            rel="stylesheet"
-            href="https://cdn.simplecss.org/simple.min.css"
-          />
           {import.meta.env.PROD ? (
             <>
               <script type="module" src="/static/client.js" />
