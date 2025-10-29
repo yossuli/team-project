@@ -1,9 +1,23 @@
 import { defineConfig } from "@pandacss/dev";
+import { createPreset } from "@park-ui/panda-preset";
+import amber from "@park-ui/panda-preset/colors/amber";
+import sand from "@park-ui/panda-preset/colors/sand";
 
 export default defineConfig({
   strictPropertyValues: true,
+  preflight: true,
+  presets: [
+    createPreset({ accentColor: amber, grayColor: sand, radius: "sm" }),
+  ],
   include: ["./client/**/*.{js,jsx,ts,tsx}"],
-  exclude: [],
+  importMap: {
+    css: "@ss/css",
+    jsx: "@ss/jsx",
+    recipes: "@ss/recipes",
+    patterns: "@ss/patterns",
+  },
+  jsxFramework: "react",
+  outdir: "./styled-system",
   globalCss: {
     "h1, h2, h3, h4, h5, h6": {
       my: {
@@ -41,13 +55,6 @@ export default defineConfig({
       width: "100%",
     },
   },
-  outdir: "./styled-system",
-  importMap: {
-    css: "@ss/css",
-    jsx: "@ss/jsx",
-    patterns: "@ss/patterns",
-  },
-  jsxFramework: "react",
   patterns: {
     extend: {
       container: {
