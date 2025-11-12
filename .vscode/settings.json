@@ -1,0 +1,23 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[prisma]": { "editor.defaultFormatter": "Prisma.prisma" },
+  "editor.codeActionsOnSave": {
+    "source.organizeImports.biome": "always",
+    "quickFix.biome": "always",
+    "source.fixAll.biome": "always"
+  },
+  "cSpell.words": []
+}
