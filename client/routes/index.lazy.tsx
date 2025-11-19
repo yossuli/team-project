@@ -13,7 +13,7 @@ export const Route = createLazyRoute("/")({
         <h1>hoge</h1>
         <div>fuga</div>
         <form action="api/test" method="post">
-          <Button >test</Button>
+          <Button>test</Button>
         </form>
       </Flex>
     );
