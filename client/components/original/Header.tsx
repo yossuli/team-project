@@ -21,28 +21,31 @@ export const Header = () => {
           <SignedOut>
             <SignInButton>
               <button
-                type="button" // :左向き指差し: [追加] Biomeエラーを修正
-                className={css({
-                  bg: "blue.500",
-                  color: "white",
-                  padding: "2 4",
-                  borderRadius: "md",
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                  _hover: {
-                    bg: "blue.600",
-                  },
-                })}
-              >
-                signin
-              </button>
+              type="button"
+              className={css({
+                bg: "blue.500",
+                color: "white",
+                padding: "3 6",
+                fontSize: "md",
+                borderRadius: "md",
+                cursor: "pointer",
+                fontWeight: "bold",
+                transition: "background 0.2s",
+                _hover: {
+                  bg: "blue.600",
+                },
+                })}>
+                  signin
+                  </button>
             </SignInButton>
           </SignedOut>
           <SignedIn>
             <Flex alignItems="center" gap="3">
-              {user.user?.username}
-              <UserButton />
-            </Flex>
+              <span className={css({ fontSize: "lg", fontWeight: "bold" })}>
+                {user.user?.username}
+                </span>
+                <UserButton />
+                </Flex>
           </SignedIn>
         </div>
       </Flex>
