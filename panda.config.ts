@@ -7,9 +7,10 @@ export default defineConfig({
   strictPropertyValues: true,
   preflight: true,
   presets: [
+    "@pandacss/dev/presets",
     createPreset({ accentColor: amber, grayColor: sand, radius: "sm" }),
   ],
-  include: ["./client/**/*.{js,jsx,ts,tsx}"],
+  include: ["./app/**/*.{js,jsx,ts,tsx}", "./client/**/*.{js,jsx,ts,tsx}"],
   importMap: {
     css: "@ss/css",
     jsx: "@ss/jsx",
