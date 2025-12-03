@@ -18,3 +18,174 @@ model Test {
   createBy  String
   createdAt DateTime @default(now())
 }
+
+// User information
+model User {
+  id              String   @id // Clerk ID or UUID
+  email           String   @unique
+  passwordHash    String   @map("password_hash") // Clerkを使用するので、おそらく不要
+  nickname        String
+  iconImageUrl    String?  @map("icon_image_url")
+  profileIsPublic Int      @default(0) @map("profile_is_public")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  habits              Habit[]
+  reservations        Reservation[]
+  participatedGroups  RideGroupParticipant[]
+  sentJoinRequests    JoinRequest[]
+  
+  // Blocks
+  blocksGiven    Block[] @relation("Blocker")
+  blocksReceived Block[] @relation("Blocked")
+
+  @@map("users")
+  @@index([email])
+}
+
+// Habit information
+model Habit {
+  id                   Int      @id @default(autoincrement())
+  userId               String   @map("user_id")
+  habitName            String   @map("habit_name")
+  departureLocation    String   @map("departure_location")
+  departureLatitude    Float    @map("departure_latitude")
+  departureLongitude   Float    @map("departure_longitude")
+  destinationLocation  String   @map("destination_location")
+  destinationLatitude  Float    @map("destination_latitude")
+  destinationLongitude Float    @map("destination_longitude")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  desiredTimes HabitDesiredTime[]
+
+  @@map("habits")
+  @@index([userId])
+  @@index([departureLatitude, departureLongitude])
+  @@index([destinationLatitude, destinationLongitude])
+}
+
+// Habit desired times
+model HabitDesiredTime {
+  id        Int    @id @default(autoincrement())
+  habitId   Int    @map("habit_id")
+  dayOfWeek Int    @map("day_of_week") // 0-6
+  startTime String @map("start_time") // HH:MM
+  endTime   String @map("end_time")   // HH:MM
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@map("habits_desired_times")
+  @@index([habitId])
+}
+
+// Reservation information
+model Reservation {
+  id                   Int      @id @default(autoincrement())
+  userId               String   @map("user_id")
+  departureLocation    String   @map("departure_location")
+  departureLatitude    Float    @map("departure_latitude")
+  departureLongitude   Float    @map("departure_longitude")
+  destinationLocation  String   @map("destination_location")
+  destinationLatitude  Float    @map("destination_latitude")
+  destinationLongitude Float    @map("destination_longitude")
+  status               String   @default("active") // active, inactive, grouped
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  desiredTimes ReservationDesiredTime[]
+  
+  // 予約がグループを始めているなら
+  initiatedRideGroup RideGroup?
+
+  // 予約がグループに参加しているなら
+  participation RideGroupParticipant?
+
+  @@map("reservations")
+  @@index([userId])
+  @@index([status])
+  @@index([departureLatitude, departureLongitude])
+  @@index([destinationLatitude, destinationLongitude])
+}
+
+// Reservation desired times
+model ReservationDesiredTime {
+  id            Int    @id @default(autoincrement())
+  reservationId Int    @map("reservation_id")
+  startTime     DateTime @map("start_time") // Prisma DateTimeの方がいいかも
+  endTime       DateTime @map("end_time")
+  rank          Int
+  source        String @default("manual") // manual, habit
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@map("reservation_desired_times")
+  @@index([startTime, endTime])
+  @@index([source])
+}
+
+// Ride groups
+model RideGroup {
+  id                   Int      @id @default(autoincrement())
+  initialReservationId Int      @unique @map("initial_reservation_id")
+  status               String   @default("forming") // forming, confirmed, completed, canceled
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  initialReservation Reservation            @relation(fields: [initialReservationId], references: [id], onDelete: Cascade)
+  participants       RideGroupParticipant[]
+  joinRequests       JoinRequest[]
+  relatedBlocks      Block[]
+
+  @@map("ride_groups")
+}
+
+// Group participants
+model RideGroupParticipant {
+  groupId       Int      @map("group_id")
+  userId        String   @map("user_id")
+  reservationId Int      @unique @map("reservation_id")
+  role          String   @default("participant") // organizer, participant
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  group       RideGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@map("ride_group_participants")
+}
+
+// Join requests
+model JoinRequest {
+  id          Int      @id @default(autoincrement())
+  requesterId String   @map("requester_id")
+  groupId     Int      @map("group_id")
+  status      String   @default("pending") // pending, approved, rejected
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  requester User      @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  group     RideGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@map("join_requests")
+  @@index([groupId])
+}
+
+// Blocks
+model Block {
+  blockerId   String   @map("blocker_id")
+  blockedId   String   @map("blocked_id")
+  rideGroupId Int?     @map("ride_group_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  blocker   User       @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User       @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  rideGroup RideGroup? @relation(fields: [rideGroupId], references: [id]) // Set NULL on delete handled by optional
+
+  @@id([blockerId, blockedId])
+  @@map("blocks")
+  @@index([rideGroupId])
+}
