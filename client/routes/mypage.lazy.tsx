@@ -3,7 +3,7 @@
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Flex, Grid } from "@ss/jsx";
-import { createLazyFileRoute, Link } from "@tanstack/react-router"; // 👈 Linkを追加
+import { Link, createLazyFileRoute } from "@tanstack/react-router";
 
 export const Route = createLazyFileRoute("/mypage")({
   component: MyPage,
@@ -64,10 +64,6 @@ function MyPage() {
               })}
             />
           )}
-          {/* 名前を表示したい場合はコメントアウトを解除 */}
-          {/* <span className={css({ fontWeight: "bold", fontSize: "lg" })}>
-            {user?.fullName || user?.username}
-          </span> */}
         </Flex>
 
         {/* 右側: プロフィール編集ボタン */}
@@ -92,12 +88,16 @@ function MyPage() {
 
       {/* --- 2. メニューボタンエリア --- */}
       <Flex direction="column" gap="4">
-        {/* 他のページも作成したら Link で囲んでください */}
-        <MenuButton>習慣的な予約情報ページ</MenuButton>
+        {/* 👇 [修正] Linkで囲んで /habits (習慣的な予約情報) へ遷移させる */}
+        <Link to="/habits" style={{ width: "100%" }}>
+          <MenuButton>習慣的な予約情報ページ</MenuButton>
+        </Link>
+
+        {/* 登録予約情報一覧はまだ未作成なのでそのまま */}
         <MenuButton>登録予約情報一覧</MenuButton>
 
         <Grid gridTemplateColumns="1fr 1fr" gap="4">
-          {/* 👇 [修正] Linkで囲んでマッチング履歴ページへ遷移させる */}
+          {/* マッチング履歴へのリンク */}
           <Link to="/matching-history" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               マッチング
@@ -106,6 +106,7 @@ function MyPage() {
             </MenuButton>
           </Link>
 
+          {/* ブロック管理へのリンク */}
           <Link to="/block-list" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               ブロック
