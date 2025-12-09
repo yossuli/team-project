@@ -7,16 +7,16 @@ export const Route = createLazyFileRoute("/habits")({
   component: HabitsPage,
 });
 
-// データ型定義 (曜日とON/OFFを削除)
+// データ型定義
 type Habit = {
   id: number;
   departure: string;
   destination: string;
-  startTime: string; // "09:00"
-  endTime: string; // "10:00"
+  startTime: string;
+  endTime: string;
 };
 
-// --- 🛠️ モックデータ ---
+// モックデータ
 const initialHabits: Habit[] = [
   {
     id: 1,
@@ -38,9 +38,7 @@ function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>(initialHabits);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 予約ボタンを押した時の処理
   const handleBook = (habit: Habit) => {
-    // ここで実際に予約APIを叩くことになります
     if (
       confirm(
         `以下の内容で予約を作成しますか？\n\n場所: ${habit.departure} → ${habit.destination}\n時間: ${habit.startTime} - ${habit.endTime}`,
@@ -50,7 +48,6 @@ function HabitsPage() {
     }
   };
 
-  // 削除処理
   const deleteHabit = (id: number) => {
     if (confirm("このテンプレートを削除しますか？")) {
       setHabits((prev) => prev.filter((h) => h.id !== id));
@@ -74,7 +71,7 @@ function HabitsPage() {
             to="/mypage"
             className={css({
               fontSize: "sm",
-              color: "gray.500",
+              color: "primary", // 👈 [変更] リンクを青に
               textDecoration: "underline",
               cursor: "pointer",
             })}
@@ -108,15 +105,12 @@ function HabitsPage() {
                   boxShadow: "sm",
                 })}
               >
-                {/* メイン情報と予約ボタン */}
                 <Flex
                   justifyContent="space-between"
                   alignItems="center"
                   gap="4"
                 >
-                  {/* 左側: 詳細情報 */}
                   <Flex direction="column" gap="1" flex={1}>
-                    {/* 時間 */}
                     <Box fontSize="2xl" fontWeight="bold" lineHeight="1" mb="1">
                       {habit.startTime}
                       <span
@@ -129,34 +123,32 @@ function HabitsPage() {
                         - {habit.endTime}
                       </span>
                     </Box>
-                    {/* 場所 */}
                     <Box fontWeight="medium" fontSize="md">
                       {habit.departure} → {habit.destination}
                     </Box>
                   </Flex>
 
-                  {/* 右側: 予約ボタン */}
+                  {/* 予約ボタン */}
                   <button
                     type="button"
                     onClick={() => handleBook(habit)}
                     className={css({
-                      bg: "black",
+                      bg: "primary", // 👈 [変更] 青ボタン
                       color: "white",
                       fontSize: "sm",
                       fontWeight: "bold",
                       padding: "3 6",
                       borderRadius: "md",
                       cursor: "pointer",
-                      whiteSpace: "nowrap", // 改行させない
+                      whiteSpace: "nowrap",
                       transition: "background 0.2s",
-                      _hover: { bg: "gray.800" },
+                      _hover: { bg: "secondary" }, // 👈 [変更] ホバー色
                     })}
                   >
-                    登録する
+                    予約する
                   </button>
                 </Flex>
 
-                {/* 削除ボタン (右下に配置) */}
                 <Flex justifyContent="flex-end" mt="2">
                   <button
                     type="button"
@@ -191,7 +183,7 @@ function HabitsPage() {
           width: "14",
           height: "14",
           borderRadius: "full",
-          bg: "black",
+          bg: "black", // ※ここはアイコン的なので黒のままでもOKですが、青にするなら "primary"
           color: "white",
           fontSize: "3xl",
           display: "flex",
@@ -294,7 +286,6 @@ function AddHabitModal({
             gap: "4",
           })}
         >
-          {/* 場所 */}
           <Flex direction="column" gap="2">
             <label className={css({ fontSize: "sm", fontWeight: "bold" })}>
               場所
@@ -321,7 +312,6 @@ function AddHabitModal({
             />
           </Flex>
 
-          {/* 時間 */}
           <Flex direction="column" gap="2">
             <label className={css({ fontSize: "sm", fontWeight: "bold" })}>
               時間帯
@@ -353,7 +343,6 @@ function AddHabitModal({
             </Flex>
           </Flex>
 
-          {/* アクションボタン */}
           <Flex gap="3" mt="4">
             <button
               type="button"
@@ -375,10 +364,12 @@ function AddHabitModal({
                 flex: 1,
                 padding: "3",
                 borderRadius: "md",
-                bg: "black",
+                bg: "primary", // 👈 [変更] 保存ボタンも青に
                 color: "white",
                 fontWeight: "bold",
                 cursor: "pointer",
+                transition: "background 0.2s",
+                _hover: { bg: "secondary" }, // 👈 [変更] ホバー色
               })}
             >
               保存
