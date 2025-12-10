@@ -1,6 +1,6 @@
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
-import { Link, createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 export const Route = createLazyFileRoute("/habits")({
@@ -67,17 +67,6 @@ function HabitsPage() {
       >
         {/* ヘッダー */}
         <Flex alignItems="center" gap="4">
-          <Link
-            to="/mypage"
-            className={css({
-              fontSize: "sm",
-              color: "primary", // 👈 [変更] リンクを青に
-              textDecoration: "underline",
-              cursor: "pointer",
-            })}
-          >
-            ← マイページ
-          </Link>
           <h1 className={css({ fontSize: "xl", fontWeight: "bold" })}>
             よく使うルート
           </h1>
