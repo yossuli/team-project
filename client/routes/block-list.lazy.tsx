@@ -1,46 +1,75 @@
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createLazyFileRoute("/block-list")({
   component: BlockListPage,
 });
 
-// --- 🛠️ モックデータ (詳細情報つき) ---
-const initialBlockedUsers = [
-  {
-    id: "user-001",
-    name: "田中 太郎",
-    icon: "https://via.placeholder.com/150",
-    habitualRoute: "東京駅 ↔ 新宿駅 (平日 9:00)",
-    bio: "平日は毎日通勤で利用しています。静かに過ごすのが好きです。",
-  },
-  {
-    id: "user-099",
-    name: "迷惑 ユーザー",
-    icon: "https://via.placeholder.com/150",
-    habitualRoute: "不明",
-    bio: "（自己紹介は設定されていません）",
-  },
-];
+// データ型の定義
+type BlockedUser = {
+  id: string;
+  name: string;
+  icon: string;
+  blockedDate: string;
+  habitualRoute: string;
+  bio: string;
+};
 
 function BlockListPage() {
-  const [blockedUsers, setBlockedUsers] = useState(initialBlockedUsers);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<BlockedUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 選択されたユーザーのデータを管理するstate
-  const [selectedUser, setSelectedUser] = useState<
-    (typeof initialBlockedUsers)[0] | null
-  >(null);
+  // 画面表示時にAPIから一覧を取得
+  useEffect(() => {
+    const fetchBlockedUsers = async () => {
+      try {
+        const res = await fetch("/api/block-list");
+        if (res.ok) {
+          const data = await res.json();
+          setBlockedUsers(data);
+        }
+      } catch (error) {
+        console.error("Error fetching blocked users:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // ブロック解除ボタンを押した時の処理
-  const handleUnblock = (userId: string, userName: string) => {
+    fetchBlockedUsers();
+  }, []);
+
+  // ブロック解除ボタンの処理
+  const handleUnblock = async (userId: string, userName: string) => {
     if (confirm(`${userName}さんのブロックを解除しますか？`)) {
-      // リストから削除する (モック処理)
-      setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
-      alert("ブロックを解除しました");
+      try {
+        // APIを叩いて削除
+        const res = await fetch(`/api/block-list?targetId=${userId}`, {
+          method: "DELETE",
+        });
+
+        if (res.ok) {
+          // 成功したら画面のリストからも消す
+          setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
+          alert("ブロックを解除しました");
+        } else {
+          alert("解除に失敗しました");
+        }
+      } catch (error) {
+        console.error("Error unblocking user:", error);
+      }
     }
   };
+
+  if (isLoading) {
+    return (
+      <Flex justify="center" p="10">
+        読み込み中...
+      </Flex>
+    );
+  }
 
   return (
     <>
@@ -80,7 +109,7 @@ function BlockListPage() {
                   boxShadow: "sm",
                 })}
               >
-                {/* ユーザー情報部分 (クリックでモーダル表示) */}
+                {/* ユーザー情報部分 */}
                 <Flex
                   alignItems="center"
                   gap="3"
@@ -106,13 +135,19 @@ function BlockListPage() {
                     <span className={css({ fontWeight: "bold" })}>
                       {user.name}
                     </span>
+                    <span
+                      className={css({ fontSize: "xs", color: "gray.500" })}
+                    >
+                      ブロック日:{" "}
+                      {new Date(user.blockedDate).toLocaleDateString()}
+                    </span>
                   </Flex>
                 </Flex>
 
                 <button
                   type="button"
                   onClick={(e) => {
-                    e.stopPropagation(); // 親のクリックイベント(モーダル表示)を止める
+                    e.stopPropagation();
                     handleUnblock(user.id, user.name);
                   }}
                   className={css({
@@ -138,7 +173,7 @@ function BlockListPage() {
         </Flex>
       </Flex>
 
-      {/* 👇 ユーザー詳細モーダル (selectedUserがある時だけ表示) */}
+      {/* 詳細モーダル */}
       {selectedUser && (
         <BlockedUserInfoModal
           user={selectedUser}
@@ -154,7 +189,7 @@ function BlockedUserInfoModal({
   user,
   onClose,
 }: {
-  user: (typeof initialBlockedUsers)[0];
+  user: BlockedUser;
   onClose: () => void;
 }) {
   return (
@@ -172,9 +207,8 @@ function BlockedUserInfoModal({
         justifyContent: "center",
         padding: "4",
       })}
-      onClick={onClose} // 背景クリックで閉じる
+      onClick={onClose}
     >
-      {/* モーダルの中身 */}
       <div
         className={css({
           bg: "white",
@@ -185,7 +219,7 @@ function BlockedUserInfoModal({
           position: "relative",
           boxShadow: "lg",
         })}
-        onClick={(e) => e.stopPropagation()} // 中身クリックでは閉じない
+        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
@@ -205,12 +239,11 @@ function BlockedUserInfoModal({
         </button>
 
         <Flex direction="column" alignItems="center" gap="4">
-          {/* アイコン */}
           <img
             src={user.icon}
             alt={user.name}
             className={css({
-              width: "24", // 96px
+              width: "24",
               height: "24",
               borderRadius: "full",
               objectFit: "cover",
@@ -218,14 +251,12 @@ function BlockedUserInfoModal({
               border: "1px solid token(colors.gray.200)",
             })}
           />
-          {/* 名前 */}
           <h2 className={css({ fontSize: "xl", fontWeight: "bold" })}>
             {user.name}
           </h2>
 
           <hr className={css({ width: "100%", borderColor: "gray.200" })} />
 
-          {/* 詳細情報エリア */}
           <Flex direction="column" width="100%" gap="4" textAlign="left">
             <div>
               <Box fontSize="sm" color="gray.500" mb="1">
