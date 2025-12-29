@@ -1,18 +1,33 @@
 import { Container } from "@ss/jsx";
 import { Outlet, createRootRoute } from "@tanstack/react-router";
-// :下向き指差し: [1] インポートパスを 'MypageHeader' (小文字のy) に修正
+// 👇 [1] Clerkの認証制御コンポーネントをインポート
+import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
+
 import { Header } from "../components/original/Header";
+
 export const Route = createRootRoute({
   component: RootComponent,
 });
-// :下向き指差し: [2] Biomeのエラーを無視するコメントを追加
+
 // biome-ignore lint/nursery/useComponentExportOnlyModules: <explanation>
 function RootComponent() {
   return (
     <>
       <Header />
       <Container flexDirection="column" p="4">
-        <Outlet />
+        
+        {/* --- 🔒 認証による表示の切り替え --- */}
+
+        {/* 1. ログインしている時だけ、ページの中身(Outlet)を表示 */}
+        <SignedIn>
+          <Outlet />
+        </SignedIn>
+
+        {/* 2. ログインしていない時は、サインイン画面へ強制リダイレクト */}
+        <SignedOut>
+          <RedirectToSignIn />
+        </SignedOut>
+
       </Container>
     </>
   );
