@@ -94,11 +94,11 @@ function MyPage() {
 
       {/* --- 2. メニューボタンエリア --- */}
       <Flex direction="column" gap="4">
-        {/* 👇 [追加] メインアクション: 相乗り検索 (ここを青にする) */}
+        {/* 👇 [復活] メインアクション: 相乗り検索 (テックブルー) */}
         <Link
           to="/"
           className={css({
-            bg: "primary", // テックブルー
+            bg: "primary",
             color: "white",
             fontSize: "md",
             fontWeight: "bold",
@@ -112,18 +112,18 @@ function MyPage() {
             alignItems: "center",
             justifyContent: "center",
             gap: "2",
-            _hover: { bg: "secondary" }, // 明るい青
+            _hover: { bg: "secondary" },
           })}
         >
           <span>🔍</span> 相乗りを検索する
         </Link>
 
-        {/* 👇 習慣的な予約情報 */}
+        {/* 👇 [復活] 習慣的な予約情報へのリンク */}
         <Link to="/habits" style={{ width: "100%" }}>
           <MenuButton>習慣的な予約情報ページ</MenuButton>
         </Link>
 
-        {/* 登録予約情報一覧 */}
+        {/* 登録予約情報一覧 (まだページがない場合はボタンのみ) */}
         <MenuButton>登録予約情報一覧</MenuButton>
 
         <Grid gridTemplateColumns="1fr 1fr" gap="4">
@@ -150,7 +150,7 @@ function MyPage() {
   );
 }
 
-// --- 共通のメニューボタン部品 (カードスタイルに変更) ---
+// --- 共通のメニューボタン部品 (カードスタイル) ---
 function MenuButton({
   children,
   style,
