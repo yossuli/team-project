@@ -1,5 +1,5 @@
-"use client";
-
+import { css } from "@ss/css";
+import { Box, Flex, styled } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -11,14 +11,13 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
-import { Box, Flex, styled } from "styled-system/jsx";
 
-export const Route = createLazyFileRoute("/")({
-  component: RegistrationScreen,
+export const Route = createLazyFileRoute("/habits")({
+  component: HabitsPage,
 });
 
 // =================================================================
-// 1. DestinationPicker (テキスト入力 & 検索ボタン)
+// 📍 1. DestinationPicker (テキスト入力 & 検索ボタン)
 // =================================================================
 
 const Label = styled("label", {
@@ -42,8 +41,8 @@ const InputContainer = styled("div", {
     height: "48px",
     transition: "all 0.2s",
     _focusWithin: {
-      borderColor: "#333",
-      boxShadow: "0 0 0 2px rgba(0,0,0,0.1)",
+      borderColor: "primary",
+      boxShadow: "0 0 0 2px rgba(37, 99, 235, 0.2)",
     },
   },
 });
@@ -65,13 +64,13 @@ const IconButton = styled("button", {
 interface DestinationPickerProps {
   label?: string;
   value: string;
-  isLocationSet: boolean;
+  isLocationSet: boolean; // 座標がセットされているか
   onChange: (val: string) => void;
   onSearch: () => void;
   onMapClick: () => void;
 }
 
-export const DestinationPicker = ({
+const DestinationPicker = ({
   label = "目的地を選択",
   value,
   isLocationSet,
@@ -83,9 +82,14 @@ export const DestinationPicker = ({
     <Box width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Label>{label}</Label>
+        {/* 👇 座標セット済みならチェックマークを表示 */}
         {isLocationSet && (
           <span
-            style={{ fontSize: "12px", color: "#16a34a", fontWeight: "bold" }}
+            className={css({
+              fontSize: "xs",
+              color: "green.600",
+              fontWeight: "bold",
+            })}
           >
             ✅ 位置情報OK
           </span>
@@ -98,6 +102,7 @@ export const DestinationPicker = ({
             : {}
         }
       >
+        {/* 地図アイコンボタン */}
         <IconButton
           type="button"
           onClick={onMapClick}
@@ -106,9 +111,11 @@ export const DestinationPicker = ({
         >
           📍
         </IconButton>
+
+        {/* テキスト入力欄 */}
         <input
           type="text"
-          placeholder="場所名を入力 (例: 東京駅)"
+          placeholder="場所名 (例: 自宅, 東京駅)"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -129,25 +136,32 @@ export const DestinationPicker = ({
             minWidth: 0,
           }}
         />
+
+        {/* 検索ボタン */}
         <IconButton
           type="button"
           onClick={onSearch}
-          style={{ backgroundColor: "#222", color: "white" }}
+          className={css({
+            bg: "gray.800",
+            color: "white",
+            _hover: { bg: "black" },
+          })}
           title="検索して地図に表示"
         >
           🔍
         </IconButton>
       </InputContainer>
+      {/* 補足メッセージ: 座標取得済みなら名前変更OKと伝える */}
       {isLocationSet && (
         <div
-          style={{
-            fontSize: "11px",
-            color: "#666",
-            marginTop: "4px",
+          className={css({
+            fontSize: "xs",
+            color: "gray.500",
+            mt: "1",
             textAlign: "right",
-          }}
+          })}
         >
-          ※名前を変更しても位置情報は保持されます
+          ※名前を「自宅」などに変更しても位置情報は保持されます
         </div>
       )}
     </Box>
@@ -155,7 +169,7 @@ export const DestinationPicker = ({
 };
 
 // =================================================================
-// 2. Leaflet 設定 & モーダル
+// 🗺️ 2. Leaflet 設定 & モーダル
 // =================================================================
 
 const icon = L.icon({
@@ -225,7 +239,7 @@ const MapModal = ({
     lat: number;
     lng: number;
   } | null>(null);
-  const defaultCenter = { lat: 35.681236, lng: 139.767125 };
+  const defaultCenter = { lat: 35.681236, lng: 139.767125 }; // 東京駅
 
   useEffect(() => {
     if (isOpen) {
@@ -248,6 +262,7 @@ const MapModal = ({
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${markerPosition.lat}&lon=${markerPosition.lng}&zoom=18&addressdetails=1`,
       );
       const data = await res.json();
+
       let smartName = "";
       const addr = data.address || {};
 
@@ -312,6 +327,7 @@ const MapModal = ({
             ✕
           </button>
         </Flex>
+
         <Box bg="#f0f0f0" height="320px" width="100%" position="relative">
           <MapContainer
             center={center}
@@ -326,6 +342,7 @@ const MapModal = ({
             <MapClickHandler onLocationSelect={setMarkerPosition} />
             {markerPosition && <Marker position={markerPosition} icon={icon} />}
           </MapContainer>
+
           {!markerPosition && (
             <Box
               position="absolute"
@@ -346,19 +363,20 @@ const MapModal = ({
             </Box>
           )}
         </Box>
+
         <Flex p="4" justify="flex-end" gap="3" bg="#fafafa">
           <button
             type="button"
             onClick={onClose}
-            style={{
+            className={css({
               padding: "10px 20px",
               borderRadius: "8px",
-              background: "white",
+              bg: "white",
               border: "1px solid #ddd",
               cursor: "pointer",
               fontWeight: "bold",
               color: "#666",
-            }}
+            })}
           >
             キャンセル
           </button>
@@ -366,15 +384,15 @@ const MapModal = ({
             type="button"
             onClick={handleConfirm}
             disabled={!markerPosition}
-            style={{
+            className={css({
               padding: "10px 20px",
               borderRadius: "8px",
               border: "none",
-              background: markerPosition ? "#222" : "#ccc",
+              bg: markerPosition ? "primary" : "gray.300",
               color: "white",
               cursor: markerPosition ? "pointer" : "not-allowed",
               fontWeight: "bold",
-            }}
+            })}
           >
             決定
           </button>
@@ -385,7 +403,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. TimeRangeSelector
+// 🕒 3. TimeRangeSelector (時刻選択)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -397,10 +415,6 @@ const Select = styled("select", {
     backgroundColor: "white",
     cursor: "pointer",
     appearance: "none",
-    backgroundImage:
-      'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E")',
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 12px center",
   },
 });
 const TimeLabel = styled("label", {
@@ -462,9 +476,198 @@ const TimeRangeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
+// 🚀 4. メイン画面 (HabitsPage & AddHabitModal)
 // =================================================================
-function RegistrationScreen() {
+
+// データ型定義
+type Habit = {
+  id: number;
+  departure: string;
+  departureLat?: number;
+  departureLng?: number;
+  destination: string;
+  destinationLat?: number;
+  destinationLng?: number;
+  startTime: string;
+  endTime: string;
+};
+
+// 初期データは空にする
+const initialHabits: Habit[] = [];
+
+function HabitsPage() {
+  const [habits, setHabits] = useState<Habit[]>(initialHabits);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleBook = (habit: Habit) => {
+    if (
+      confirm(
+        `以下の内容で予約を作成しますか？\n\n場所: ${habit.departure} → ${habit.destination}\n時間: ${habit.startTime} - ${habit.endTime}`,
+      )
+    ) {
+      alert("予約リクエストを送信しました！");
+    }
+  };
+
+  const deleteHabit = (id: number) => {
+    if (confirm("このテンプレートを削除しますか？")) {
+      setHabits((prev) => prev.filter((h) => h.id !== id));
+    }
+  };
+
+  return (
+    <>
+      <Flex
+        direction="column"
+        gap="6"
+        width="100%"
+        maxWidth="600px"
+        mx="auto"
+        p="4"
+        pb="24"
+      >
+        {/* ヘッダー */}
+        <Flex alignItems="center" gap="4">
+          <h1 className={css({ fontSize: "xl", fontWeight: "bold" })}>
+            よく使うルート
+          </h1>
+        </Flex>
+
+        {/* 習慣リスト */}
+        <Flex direction="column" gap="4">
+          {habits.length === 0 ? (
+            <Box textAlign="center" color="gray.500" py="10">
+              登録されたルートはありません。
+              <br />
+              よく使うルートを登録して、
+              <br />
+              ワンタップで予約できるようにしましょう。
+            </Box>
+          ) : (
+            habits.map((habit) => (
+              <div
+                key={habit.id}
+                className={css({
+                  border: "1px solid token(colors.gray.200)",
+                  borderRadius: "lg",
+                  padding: "4",
+                  bg: "white",
+                  boxShadow: "sm",
+                })}
+              >
+                <Flex
+                  justifyContent="space-between"
+                  alignItems="center"
+                  gap="4"
+                >
+                  <Flex direction="column" gap="1" flex={1}>
+                    <Box fontSize="2xl" fontWeight="bold" lineHeight="1" mb="1">
+                      {habit.startTime}
+                      <span
+                        className={css({
+                          fontSize: "sm",
+                          color: "gray.500",
+                          ml: "1",
+                        })}
+                      >
+                        - {habit.endTime}
+                      </span>
+                    </Box>
+                    <Box fontWeight="medium" fontSize="md">
+                      {habit.departure} → {habit.destination}
+                    </Box>
+                  </Flex>
+
+                  {/* 予約ボタン */}
+                  <button
+                    type="button"
+                    onClick={() => handleBook(habit)}
+                    className={css({
+                      bg: "primary",
+                      color: "white",
+                      fontSize: "sm",
+                      fontWeight: "bold",
+                      padding: "3 6",
+                      borderRadius: "md",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "background 0.2s",
+                      _hover: { bg: "secondary" },
+                    })}
+                  >
+                    登録
+                  </button>
+                </Flex>
+
+                <Flex justifyContent="flex-end" mt="2">
+                  <button
+                    type="button"
+                    onClick={() => deleteHabit(habit.id)}
+                    className={css({
+                      fontSize: "xs",
+                      color: "gray.400",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      bg: "transparent",
+                      border: "none",
+                      _hover: { color: "red.500" },
+                    })}
+                  >
+                    この設定を削除
+                  </button>
+                </Flex>
+              </div>
+            ))
+          )}
+        </Flex>
+      </Flex>
+
+      {/* フローティング追加ボタン */}
+      <button
+        type="button"
+        onClick={() => setIsModalOpen(true)}
+        className={css({
+          position: "fixed",
+          bottom: "6",
+          right: "6",
+          width: "14",
+          height: "14",
+          borderRadius: "full",
+          bg: "primary",
+          color: "white",
+          fontSize: "3xl",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "lg",
+          cursor: "pointer",
+          _hover: { bg: "secondary" },
+        })}
+      >
+        +
+      </button>
+
+      {/* 新規追加モーダル */}
+      {isModalOpen && (
+        <AddHabitModal
+          onClose={() => setIsModalOpen(false)}
+          onAdd={(newHabit) =>
+            setHabits([...habits, { ...newHabit, id: Date.now() }])
+          }
+        />
+      )}
+    </>
+  );
+}
+
+// --- 📝 新規追加モーダル (地図検索対応) ---
+function AddHabitModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (habit: Omit<Habit, "id">) => void;
+}) {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -477,17 +680,20 @@ function RegistrationScreen() {
     lat: number;
     lng: number;
   } | null>(null);
+
   const [destinationName, setDestinationName] = useState("");
   const [destinationCoords, setDestinationCoords] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
 
+  // マップを開く
   const openMap = (field: "departure" | "destination") => {
     setTargetField(field);
     setIsMapOpen(true);
   };
 
+  // 入力文字から検索 (Nominatim API)
   const handleSearch = async (
     field: "departure" | "destination",
     query: string,
@@ -502,6 +708,7 @@ function RegistrationScreen() {
         )}&limit=1`,
       );
       const data = await res.json();
+
       if (data && data.length > 0) {
         const result = data[0];
         const lat = Number.parseFloat(result.lat);
@@ -515,13 +722,16 @@ function RegistrationScreen() {
         setTargetField(field);
         setIsMapOpen(true);
       } else {
-        alert("場所が見つかりませんでした。");
+        alert(
+          "場所が見つかりませんでした。「東京都 新宿区」のように入力してみてください。",
+        );
       }
     } catch (error) {
-      alert("検索エラー");
+      alert("検索中にエラーが発生しました。");
     }
   };
 
+  // 地図上で場所決定
   const handleLocationSelect = (data: any) => {
     if (targetField === "departure") {
       setDepartureName(data.address);
@@ -531,6 +741,36 @@ function RegistrationScreen() {
       setDestinationCoords({ lat: data.lat, lng: data.lng });
     }
     setTargetField(null);
+    setIsMapOpen(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 👇 [修正] ここで座標チェックを行う
+    if (!departureCoords || !destinationCoords) {
+      alert(
+        "出発地または目的地の位置情報が設定されていません。\n「🔍」ボタンを押して検索するか、「📍」ボタンで地図から場所を選択してください。",
+      );
+      return;
+    }
+
+    if (!departureName || !destinationName) {
+      alert("出発地と目的地を入力してください");
+      return;
+    }
+
+    onAdd({
+      departure: departureName,
+      departureLat: departureCoords?.lat,
+      departureLng: departureCoords?.lng,
+      destination: destinationName,
+      destinationLat: destinationCoords?.lat,
+      destinationLng: destinationCoords?.lng,
+      startTime,
+      endTime,
+    });
+    onClose();
   };
 
   const getCurrentModalCoords = () => {
@@ -543,102 +783,124 @@ function RegistrationScreen() {
     return null;
   };
 
-  const handleRegister = () => {
-    if (!departureName || !destinationName) {
-      alert("出発地と目的地を入力してください");
-      return;
-    }
-    if (!departureCoords || !destinationCoords) {
-      alert(
-        "位置情報が設定されていません。\n地図ボタン「📍」または検索ボタン「🔍」で場所を確定させてください。",
-      );
-      return;
-    }
-    console.log("登録データ:", {
-      departure: { name: departureName, ...departureCoords },
-      destination: { name: destinationName, ...destinationCoords },
-      startTime,
-      endTime,
-    });
-    alert("登録が完了しました！(モック)");
-  };
-
   return (
-    // 👇 レイアウト制御の肝部分
-    <Flex
-      direction="column"
-      align="center"
-      justify="space-evenly" // 均等配置で画面内に収める
-      height="calc(100dvh - 74px)" // ヘッダー分(約74px)を引いてスクロール回避
-      width="100%"
-      maxWidth="400px"
-      mx="auto"
-      px="4"
-      pb="4"
-      overflow="hidden" // はみ出し防止
-    >
-      <Box width="100%">
-        <h1
-          style={{
-            textAlign: "center",
-            fontSize: "20px",
-            fontWeight: "bold",
-            marginBottom: "16px",
-          }}
-        >
-          移動情報を登録する
-        </h1>
-
-        <Box mb="4">
-          <DestinationPicker
-            label="出発地"
-            value={departureName}
-            isLocationSet={!!departureCoords}
-            onChange={setDepartureName}
-            onMapClick={() => openMap("departure")}
-            onSearch={() => handleSearch("departure", departureName)}
-          />
-        </Box>
-
-        <Box mb="4">
-          <DestinationPicker
-            label="目的地"
-            value={destinationName}
-            isLocationSet={!!destinationCoords}
-            onChange={setDestinationName}
-            onMapClick={() => openMap("destination")}
-            onSearch={() => handleSearch("destination", destinationName)}
-          />
-        </Box>
-
-        <Box>
-          <TimeRangeSelector
-            startTime={startTime}
-            endTime={endTime}
-            onChangeStart={setStartTime}
-            onChangeEnd={setEndTime}
-          />
-        </Box>
-      </Box>
-
-      <button
-        type="button"
-        onClick={handleRegister}
-        style={{
-          width: "100%",
-          padding: "16px",
-          background: "#222",
-          color: "white",
-          borderRadius: "12px",
-          border: "none",
-          fontSize: "16px",
-          fontWeight: "bold",
-          cursor: "pointer",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-        }}
+    <>
+      <div
+        className={css({
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          bg: "rgba(0, 0, 0, 0.5)",
+          zIndex: 100,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4",
+        })}
+        onClick={onClose}
       >
-        登録
-      </button>
+        <div
+          className={css({
+            bg: "white",
+            width: "100%",
+            maxWidth: "400px",
+            borderRadius: "lg",
+            padding: "6",
+            maxHeight: "90vh",
+            overflowY: "auto",
+          })}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h2
+            className={css({
+              fontSize: "lg",
+              fontWeight: "bold",
+              mb: "4",
+              textAlign: "center",
+            })}
+          >
+            よく使うルートを追加
+          </h2>
+
+          <form
+            onSubmit={handleSubmit}
+            className={css({
+              display: "flex",
+              flexDirection: "column",
+              gap: "4",
+            })}
+          >
+            <Box mb="2">
+              <DestinationPicker
+                label="出発地"
+                value={departureName}
+                isLocationSet={!!departureCoords} // 座標があるか渡す
+                onChange={setDepartureName}
+                onMapClick={() => openMap("departure")}
+                onSearch={() => handleSearch("departure", departureName)}
+              />
+            </Box>
+
+            <Box mb="4">
+              <DestinationPicker
+                label="目的地"
+                value={destinationName}
+                isLocationSet={!!destinationCoords} // 座標があるか渡す
+                onChange={setDestinationName}
+                onMapClick={() => openMap("destination")}
+                onSearch={() => handleSearch("destination", destinationName)}
+              />
+            </Box>
+
+            <Box mb="4">
+              <TimeRangeSelector
+                startTime={startTime}
+                endTime={endTime}
+                onChangeStart={setStartTime}
+                onChangeEnd={setEndTime}
+              />
+            </Box>
+
+            <Flex gap="3" mt="4">
+              <button
+                type="button"
+                onClick={onClose}
+                className={css({
+                  flex: 1,
+                  padding: "3",
+                  borderRadius: "md",
+                  bg: "gray.200",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                })}
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                // 座標がない場合はグレーアウトさせることもできますが、
+                // あえて押させてエラーメッセージを出す方が親切な場合もあります。
+                // 今回は通常のスタイルですが、押すとエラーが出ます。
+                className={css({
+                  flex: 1,
+                  padding: "3",
+                  borderRadius: "md",
+                  bg: "primary",
+                  color: "white",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                  _hover: { bg: "secondary" },
+                })}
+              >
+                保存
+              </button>
+            </Flex>
+          </form>
+        </div>
+      </div>
 
       <MapModal
         isOpen={isMapOpen}
@@ -647,6 +909,6 @@ function RegistrationScreen() {
         title={targetField === "departure" ? "出発地を選択" : "目的地を選択"}
         initialPosition={getCurrentModalCoords()}
       />
-    </Flex>
+    </>
   );
 }

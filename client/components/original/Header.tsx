@@ -8,11 +8,12 @@ import {
 } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Flex } from "@ss/jsx";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 export const Header = () => {
   const { user } = useUser();
-  const clerk = useClerk(); // ← Clerkインスタンス取得
+  const clerk = useClerk();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -21,6 +22,7 @@ export const Header = () => {
         padding: "4",
         borderBottom: "1px solid token(colors.gray.200)",
         position: "relative",
+        bg: "white", // 背景色を明示的に白に
       })}
     >
       <Flex justifyContent="space-between" alignItems="center">
@@ -34,11 +36,32 @@ export const Header = () => {
             cursor: "pointer",
             fontSize: "2xl",
             margin: 0,
+            padding: "1",
+            color: "gray.700", // アイコンも少し濃いグレーに
           })}
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
           ☰
         </button>
+
+        {/* 中央: アプリ名 (Norun) */}
+        <Link
+          to="/"
+          className={css({ textDecoration: "none", color: "inherit" })}
+        >
+          <span
+            className={css({
+              fontSize: "2xl",
+              fontWeight: "extrabold", // より太くしてロゴ感を出す
+              // 👇 [変更] 青色(primary) から 濃いグレー(gray.900) に変更
+              color: "gray.900",
+              fontFamily: "sans-serif",
+              letterSpacing: "-0.02em", // 少し文字を詰めてモダンに
+            })}
+          >
+            Norun
+          </span>
+        </Link>
 
         {/* 右側: ユーザー情報 */}
         <div>
@@ -47,10 +70,10 @@ export const Header = () => {
               <button
                 type="button"
                 className={css({
-                  bg: "blue.500",
+                  bg: "primary", // ボタンは青のまま（アクセント）
                   color: "white",
-                  padding: "3 6",
-                  fontSize: "md",
+                  padding: "2 4",
+                  fontSize: "sm",
                   borderRadius: "md",
                   cursor: "pointer",
                   fontWeight: "bold",
@@ -65,7 +88,13 @@ export const Header = () => {
 
           <SignedIn>
             <Flex alignItems="center" gap="3">
-              <span className={css({ fontSize: "lg", fontWeight: "bold" })}>
+              <span
+                className={css({
+                  fontSize: "md",
+                  fontWeight: "bold",
+                  display: { base: "none", md: "block" },
+                })}
+              >
                 {user?.username}
               </span>
               <UserButton />
@@ -74,7 +103,7 @@ export const Header = () => {
         </div>
       </Flex>
 
-      {/* サイドメニュー */}
+      {/* --- サイドメニュー (スライドイン) --- */}
       <div
         className={css({
           position: "fixed",
@@ -94,11 +123,14 @@ export const Header = () => {
           type="button"
           aria-label="Close"
           className={css({
-            mb: "4",
+            mb: "6",
             bg: "transparent",
             border: "none",
             cursor: "pointer",
             fontSize: "2xl",
+            display: "block",
+            marginLeft: "auto",
+            color: "gray.700",
           })}
           onClick={() => setIsMenuOpen(false)}
         >
@@ -111,39 +143,43 @@ export const Header = () => {
             padding: 0,
             margin: 0,
             fontSize: "lg",
-            gap: "3",
+            gap: "6",
             display: "flex",
             flexDirection: "column",
           })}
         >
           {/* ホーム */}
           <li>
-            <a
-              href="/"
+            <Link
+              to="/"
               className={css({
                 textDecoration: "none",
-                color: "black",
-                _hover: { textDecoration: "underline" },
+                color: "gray.800",
+                fontWeight: "medium",
+                display: "block",
+                _hover: { color: "primary" },
               })}
               onClick={() => setIsMenuOpen(false)}
             >
               ホーム
-            </a>
+            </Link>
           </li>
 
           {/* マイページ */}
           <li>
-            <a
-              href="/mypage"
+            <Link
+              to="/mypage"
               className={css({
                 textDecoration: "none",
-                color: "black",
-                _hover: { textDecoration: "underline" },
+                color: "gray.800",
+                fontWeight: "medium",
+                display: "block",
+                _hover: { color: "primary" },
               })}
               onClick={() => setIsMenuOpen(false)}
             >
               マイページ
-            </a>
+            </Link>
           </li>
 
           {/* ログアウト */}
@@ -157,12 +193,14 @@ export const Header = () => {
                 cursor: "pointer",
                 fontSize: "lg",
                 textAlign: "left",
-                color: "black",
-                _hover: { textDecoration: "underline" },
+                color: "red.500",
+                fontWeight: "medium",
+                width: "100%",
+                _hover: { opacity: 0.7 },
               })}
               onClick={() => {
                 setIsMenuOpen(false);
-                clerk.signOut(); // ← Clerkログアウト
+                clerk.signOut();
               }}
             >
               ログアウト
@@ -174,8 +212,17 @@ export const Header = () => {
       {/* 背景オーバーレイ */}
       {isMenuOpen && (
         <div
-          role="button" // アクセシビリティ用
-          tabIndex={0} // フォーカス可能にする
+          role="button"
+          tabIndex={0}
+          className={css({
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            bg: "rgba(0, 0, 0, 0.5)",
+            zIndex: 40,
+          })}
           onClick={() => setIsMenuOpen(false)}
           onKeyUp={(e) => {
             if (e.key === "Enter" || e.key === " ") {
