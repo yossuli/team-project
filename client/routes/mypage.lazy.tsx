@@ -94,12 +94,40 @@ function MyPage() {
 
       {/* --- 2. メニューボタンエリア --- */}
       <Flex direction="column" gap="4">
-        {/* 他のページも作成したら Link で囲んでください */}
-        <MenuButton>習慣的な予約情報ページ</MenuButton>
+        {/* 👇 [復活] メインアクション: 相乗り検索 (テックブルー) */}
+        <Link
+          to="/"
+          className={css({
+            bg: "primary",
+            color: "white",
+            fontSize: "md",
+            fontWeight: "bold",
+            padding: "4",
+            borderRadius: "md",
+            textAlign: "center",
+            textDecoration: "none",
+            boxShadow: "md",
+            transition: "background 0.2s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "2",
+            _hover: { bg: "secondary" },
+          })}
+        >
+          <span>🔍</span> 相乗りを検索する
+        </Link>
+
+        {/* 👇 [復活] 習慣的な予約情報へのリンク */}
+        <Link to="/habits" style={{ width: "100%" }}>
+          <MenuButton>習慣的な予約情報ページ</MenuButton>
+        </Link>
+
+        {/* 登録予約情報一覧 (まだページがない場合はボタンのみ) */}
         <MenuButton>登録予約情報一覧</MenuButton>
 
         <Grid gridTemplateColumns="1fr 1fr" gap="4">
-          {/* 👇 [修正] Linkで囲んでマッチング履歴ページへ遷移させる */}
+          {/* マッチング履歴 */}
           <Link to="/matching-history" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               マッチング
@@ -108,6 +136,7 @@ function MyPage() {
             </MenuButton>
           </Link>
 
+          {/* ブロック管理 */}
           <Link to="/block-list" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               ブロック
@@ -121,7 +150,7 @@ function MyPage() {
   );
 }
 
-// --- 共通のメニューボタン部品 (カードスタイルに変更) ---
+// --- 共通のメニューボタン部品 (カードスタイル) ---
 function MenuButton({
   children,
   style,

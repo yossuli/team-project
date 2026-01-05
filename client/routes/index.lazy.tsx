@@ -1,6 +1,9 @@
 "use client";
 
 import { createLazyFileRoute } from "@tanstack/react-router";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
   Marker,
@@ -9,9 +12,10 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import { Box, Flex, styled } from "styled-system/jsx";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import { useEffect, useMemo, useState } from "react";
+
+export const Route = createLazyFileRoute("/")({
+  component: RegistrationScreen,
+});
 
 // =================================================================
 // 1. DestinationPicker (テキスト入力 & 検索ボタン)
@@ -61,23 +65,39 @@ const IconButton = styled("button", {
 interface DestinationPickerProps {
   label?: string;
   value: string;
+  isLocationSet: boolean;
   onChange: (val: string) => void;
-  onSearch: () => void; // 検索実行
-  onMapClick: () => void; // 地図ボタンクリック
+  onSearch: () => void;
+  onMapClick: () => void;
 }
 
 export const DestinationPicker = ({
   label = "目的地を選択",
   value,
+  isLocationSet,
   onChange,
   onSearch,
   onMapClick,
 }: DestinationPickerProps) => {
   return (
     <Box width="100%">
-      <Label>{label}</Label>
-      <InputContainer>
-        {/* 地図アイコンボタン */}
+      <Flex justifyContent="space-between" alignItems="center">
+        <Label>{label}</Label>
+        {isLocationSet && (
+          <span
+            style={{ fontSize: "12px", color: "#16a34a", fontWeight: "bold" }}
+          >
+            ✅ 位置情報OK
+          </span>
+        )}
+      </Flex>
+      <InputContainer
+        style={
+          isLocationSet
+            ? { borderColor: "#16a34a", backgroundColor: "#f0fdf4" }
+            : {}
+        }
+      >
         <IconButton
           type="button"
           onClick={onMapClick}
@@ -86,8 +106,6 @@ export const DestinationPicker = ({
         >
           📍
         </IconButton>
-
-        {/* テキスト入力欄 */}
         <input
           type="text"
           placeholder="場所名を入力 (例: 東京駅)"
@@ -100,19 +118,17 @@ export const DestinationPicker = ({
             }
           }}
           style={{
-            flex: 1, // 横幅いっぱいに広げる
-            border: "none", // 枠線を消す
-            padding: "0 12px", // 余白
-            fontSize: "16px", // 文字サイズ
-            color: "#333", // 文字色 (黒に近いグレー)
-            outline: "none", // 青い枠線を出さない
-            backgroundColor: "transparent", // 背景透明
-            height: "100%", // 高さ100%
-            minWidth: 0, // Flexboxでの縮小対策
+            flex: 1,
+            border: "none",
+            padding: "0 12px",
+            fontSize: "16px",
+            color: "#333",
+            outline: "none",
+            backgroundColor: "transparent",
+            height: "100%",
+            minWidth: 0,
           }}
         />
-
-        {/* 検索ボタン */}
         <IconButton
           type="button"
           onClick={onSearch}
@@ -122,6 +138,18 @@ export const DestinationPicker = ({
           🔍
         </IconButton>
       </InputContainer>
+      {isLocationSet && (
+        <div
+          style={{
+            fontSize: "11px",
+            color: "#666",
+            marginTop: "4px",
+            textAlign: "right",
+          }}
+        >
+          ※名前を変更しても位置情報は保持されます
+        </div>
+      )}
     </Box>
   );
 };
@@ -141,7 +169,6 @@ const icon = L.icon({
   shadowSize: [41, 41],
 });
 
-// 地図の中心を移動させるためのコンポーネント
 const ChangeView = ({ center }: { center: { lat: number; lng: number } }) => {
   const map = useMap();
   useEffect(() => {
@@ -193,16 +220,13 @@ const MapModal = ({
   onSelectLocation,
   title,
   initialPosition,
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
 }: any) => {
   const [markerPosition, setMarkerPosition] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
-  const defaultCenter = { lat: 35.681236, lng: 139.767125 }; // 東京駅
+  const defaultCenter = { lat: 35.681236, lng: 139.767125 };
 
-  // モーダルが開いたとき、初期位置があればそこにピンを立てる
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
   useEffect(() => {
     if (isOpen) {
       if (initialPosition) {
@@ -213,7 +237,6 @@ const MapModal = ({
     }
   }, [isOpen, initialPosition]);
 
-  // マーカーがある場合はそこを中心にする、なければ東京駅
   const center = markerPosition || defaultCenter;
 
   const handleConfirm = async () => {
@@ -221,15 +244,36 @@ const MapModal = ({
       return;
     }
     try {
-      // 座標から住所名を取得 (逆ジオコーディング)
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${markerPosition.lat}&lon=${markerPosition.lng}&zoom=18&addressdetails=1`,
       );
       const data = await res.json();
-      const address = data.display_name || "住所不明";
+      let smartName = "";
+      const addr = data.address || {};
+
+      if (addr.station) {
+        smartName = addr.station;
+        if (!smartName.endsWith("駅")) {
+          smartName += "駅";
+        }
+      } else if (addr.railway) {
+        smartName = addr.railway;
+        if (!smartName.endsWith("駅")) {
+          smartName += "駅";
+        }
+      } else if (addr.amenity) {
+        smartName = addr.amenity;
+      } else if (addr.building) {
+        smartName = addr.building;
+      }
+
+      if (!smartName) {
+        const fullAddress = data.display_name || "住所不明";
+        smartName = fullAddress.split(",")[0].trim();
+      }
 
       onSelectLocation({
-        address: address, // 地図でピンを動かしたら住所も更新
+        address: smartName,
         lat: markerPosition.lat,
         lng: markerPosition.lng,
       });
@@ -255,7 +299,6 @@ const MapModal = ({
           <Box fontWeight="bold" fontSize="lg" color="#333">
             {title || "場所を選択"}
           </Box>
-          {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
           <button
             onClick={onClose}
             style={{
@@ -269,7 +312,6 @@ const MapModal = ({
             ✕
           </button>
         </Flex>
-
         <Box bg="#f0f0f0" height="320px" width="100%" position="relative">
           <MapContainer
             center={center}
@@ -284,7 +326,6 @@ const MapModal = ({
             <MapClickHandler onLocationSelect={setMarkerPosition} />
             {markerPosition && <Marker position={markerPosition} icon={icon} />}
           </MapContainer>
-
           {!markerPosition && (
             <Box
               position="absolute"
@@ -298,7 +339,6 @@ const MapModal = ({
               fontSize="12px"
               fontWeight="bold"
               color="#555"
-              boxShadow="0 2px 5px rgba(0,0,0,0.1)"
               zIndex={1000}
               pointerEvents="none"
             >
@@ -306,7 +346,6 @@ const MapModal = ({
             </Box>
           )}
         </Box>
-
         <Flex p="4" justify="flex-end" gap="3" bg="#fafafa">
           <button
             type="button"
@@ -423,7 +462,7 @@ const TimeRangeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック)
+// 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
 // =================================================================
 function RegistrationScreen() {
   const [startTime, setStartTime] = useState("09:00");
@@ -433,7 +472,6 @@ function RegistrationScreen() {
     "departure" | "destination" | null
   >(null);
 
-  // 出発地・目的地データ
   const [departureName, setDepartureName] = useState("");
   const [departureCoords, setDepartureCoords] = useState<{
     lat: number;
@@ -445,62 +483,48 @@ function RegistrationScreen() {
     lng: number;
   } | null>(null);
 
-  // マップを開く
   const openMap = (field: "departure" | "destination") => {
     setTargetField(field);
     setIsMapOpen(true);
   };
 
-  // -----------------------------------------------------------
-  // ▼ 重要: 入力文字から場所を検索する処理
-  // -----------------------------------------------------------
   const handleSearch = async (
     field: "departure" | "destination",
     query: string,
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
   ) => {
     if (!query) {
       return;
     }
     try {
-      // Nominatim API で検索
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query,
+        )}&limit=1`,
       );
       const data = await res.json();
-
       if (data && data.length > 0) {
         const result = data[0];
         const lat = Number.parseFloat(result.lat);
         const lng = Number.parseFloat(result.lon);
 
-        // 座標をセット
         if (field === "departure") {
-          // ※ 入力した文字「東京駅」などをそのまま保持したい場合は name は更新しない
-          //    もし正式名称「東京駅, 千代田区...」に書き換えたい場合はここで更新する
-          //    今回は「入力した文字」を優先しつつ、座標だけ裏でセットする
           setDepartureCoords({ lat, lng });
         } else {
           setDestinationCoords({ lat, lng });
         }
-
-        // 検索が成功したら、地図を開いてその場所を表示する (UX向上)
         setTargetField(field);
         setIsMapOpen(true);
       } else {
-        alert(
-          "場所が見つかりませんでした。「東京都 新宿区」のように入力してみてください。",
-        );
+        alert("場所が見つかりませんでした。");
       }
     } catch (error) {
-      alert("検索中にエラーが発生しました。");
+      alert("検索エラー");
     }
   };
 
-  // 地図上で場所を決定したときの処理
   const handleLocationSelect = (data: any) => {
     if (targetField === "departure") {
-      setDepartureName(data.address); // ピンの位置の住所名で上書き
+      setDepartureName(data.address);
       setDepartureCoords({ lat: data.lat, lng: data.lng });
     } else if (targetField === "destination") {
       setDestinationName(data.address);
@@ -509,7 +533,6 @@ function RegistrationScreen() {
     setTargetField(null);
   };
 
-  // モーダルを開くときに渡す初期位置
   const getCurrentModalCoords = () => {
     if (targetField === "departure") {
       return departureCoords;
@@ -520,58 +543,87 @@ function RegistrationScreen() {
     return null;
   };
 
+  const handleRegister = () => {
+    if (!departureName || !destinationName) {
+      alert("出発地と目的地を入力してください");
+      return;
+    }
+    if (!departureCoords || !destinationCoords) {
+      alert(
+        "位置情報が設定されていません。\n地図ボタン「📍」または検索ボタン「🔍」で場所を確定させてください。",
+      );
+      return;
+    }
+    console.log("登録データ:", {
+      departure: { name: departureName, ...departureCoords },
+      destination: { name: destinationName, ...destinationCoords },
+      startTime,
+      endTime,
+    });
+    alert("登録が完了しました！(モック)");
+  };
+
   return (
+    // 👇 レイアウト制御の肝部分
     <Flex
       direction="column"
       align="center"
-      pt="8"
+      justify="space-evenly" // 均等配置で画面内に収める
+      height="calc(100dvh - 74px)" // ヘッダー分(約74px)を引いてスクロール回避
       width="100%"
       maxWidth="400px"
       mx="auto"
       px="4"
+      pb="4"
+      overflow="hidden" // はみ出し防止
     >
-      <h1
-        style={{
-          textAlign: "center",
-          marginBottom: "24px",
-          fontSize: "20px",
-          fontWeight: "bold",
-        }}
-      >
-        移動情報を登録する
-      </h1>
+      <Box width="100%">
+        <h1
+          style={{
+            textAlign: "center",
+            fontSize: "20px",
+            fontWeight: "bold",
+            marginBottom: "16px",
+          }}
+        >
+          移動情報を登録する
+        </h1>
 
-      <Box mb="5">
-        <DestinationPicker
-          label="出発地"
-          value={departureName}
-          onChange={setDepartureName}
-          onMapClick={() => openMap("departure")}
-          onSearch={() => handleSearch("departure", departureName)}
-        />
-      </Box>
+        <Box mb="4">
+          <DestinationPicker
+            label="出発地"
+            value={departureName}
+            isLocationSet={!!departureCoords}
+            onChange={setDepartureName}
+            onMapClick={() => openMap("departure")}
+            onSearch={() => handleSearch("departure", departureName)}
+          />
+        </Box>
 
-      <Box mb="8">
-        <DestinationPicker
-          label="目的地"
-          value={destinationName}
-          onChange={setDestinationName}
-          onMapClick={() => openMap("destination")}
-          onSearch={() => handleSearch("destination", destinationName)}
-        />
-      </Box>
+        <Box mb="4">
+          <DestinationPicker
+            label="目的地"
+            value={destinationName}
+            isLocationSet={!!destinationCoords}
+            onChange={setDestinationName}
+            onMapClick={() => openMap("destination")}
+            onSearch={() => handleSearch("destination", destinationName)}
+          />
+        </Box>
 
-      <Box mb="8">
-        <TimeRangeSelector
-          startTime={startTime}
-          endTime={endTime}
-          onChangeStart={setStartTime}
-          onChangeEnd={setEndTime}
-        />
+        <Box>
+          <TimeRangeSelector
+            startTime={startTime}
+            endTime={endTime}
+            onChangeStart={setStartTime}
+            onChangeEnd={setEndTime}
+          />
+        </Box>
       </Box>
 
       <button
         type="button"
+        onClick={handleRegister}
         style={{
           width: "100%",
           padding: "16px",
@@ -582,7 +634,6 @@ function RegistrationScreen() {
           fontSize: "16px",
           fontWeight: "bold",
           cursor: "pointer",
-          transition: "transform 0.1s",
           boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
         }}
       >
@@ -599,7 +650,3 @@ function RegistrationScreen() {
     </Flex>
   );
 }
-
-export const Route = createLazyFileRoute("/")({
-  component: RegistrationScreen,
-});
