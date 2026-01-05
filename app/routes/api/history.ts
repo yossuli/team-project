@@ -1,26 +1,18 @@
 import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
-import { PrismaD1 } from "@prisma/adapter-d1";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client"; // 👈 普通のPrismaClientを使う
 import { createRoute } from "honox/factory";
 
-// DB接続のヘルパー関数 (test.tsと同様)
-const getPrismaClient = async (db: D1Database) => {
-  const adapter = new PrismaD1(db);
-  return new PrismaClient({ adapter });
-};
+// 👇 D1アダプターを使わず、シンプルにインスタンス化
+const prisma = new PrismaClient();
 
 export const GET = createRoute(clerkMiddleware(), async (c) => {
-  // 1. ログイン中のユーザーIDを取得
   const auth = getAuth(c);
   if (!auth?.userId) {
     return c.json({ message: "Unauthorized" }, 401);
   }
   const myUserId = auth.userId;
 
-  const prisma = await getPrismaClient(c.env.DB);
-
-  // 2. 自分が参加しているライドグループを取得
-  // (RideGroupParticipantテーブルを検索)
+  // 👇 getPrismaClient関数を経由せず直接 prisma を使う
   const myParticipations = await prisma.rideGroupParticipant.findMany({
     where: { userId: myUserId },
     include: {

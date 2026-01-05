@@ -19,6 +19,10 @@ base.get("*", async (c, next) => {
         <head>
           <meta charSet="utf-8" />
           <meta content="width=device-width, initial-scale=1" name="viewport" />
+
+          {/* 👇 ここに追加！ */}
+          <title>Norun</title>
+
           {import.meta.env.PROD ? (
             <>
               <script type="module" src="/static/client.js" />

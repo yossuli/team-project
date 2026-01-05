@@ -1,6 +1,10 @@
 "use client";
 
 import { createLazyFileRoute } from "@tanstack/react-router";
+// 👇 追加: Clerkと同期関数をインポート
+import { useUser } from "@clerk/clerk-react";
+import { syncUserToSupabase } from "../utils/syncUser";
+
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
@@ -465,6 +469,17 @@ const TimeRangeSelector = ({
 // 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
 // =================================================================
 function RegistrationScreen() {
+  // 👇 追加: Clerkのユーザー情報を取得してSupabaseに同期する処理
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      // 画面読み込み時にユーザー同期を実行
+      syncUserToSupabase(user);
+    }
+  }, [isLoaded, user]);
+  // 👆 追加ここまで
+
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [isMapOpen, setIsMapOpen] = useState(false);

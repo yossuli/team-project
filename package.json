@@ -34,6 +34,7 @@
     "@hookform/resolvers": "^5.0.1",
     "@prisma/adapter-d1": "^6.4.1",
     "@prisma/client": "^6.4.1",
+    "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-router": "^1.109.2",
     "@tanstack/router-devtools": "^1.109.2",
     "@types/leaflet": "^1.9.21",
