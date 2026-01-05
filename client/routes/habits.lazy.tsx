@@ -1,3 +1,4 @@
+import { useUser } from "@clerk/clerk-react"; // 👈 Clerkを使うためのインポート
 import { css } from "@ss/css";
 import { Box, Flex, styled } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
@@ -11,15 +12,15 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { supabase } from "../utils/supabase";
 
 export const Route = createLazyFileRoute("/habits")({
   component: HabitsPage,
 });
 
 // =================================================================
-// 📍 1. DestinationPicker (テキスト入力 & 検索ボタン)
+// 📍 1. DestinationPicker (以前と同じ)
 // =================================================================
-
 const Label = styled("label", {
   base: {
     display: "block",
@@ -64,7 +65,7 @@ const IconButton = styled("button", {
 interface DestinationPickerProps {
   label?: string;
   value: string;
-  isLocationSet: boolean; // 座標がセットされているか
+  isLocationSet: boolean;
   onChange: (val: string) => void;
   onSearch: () => void;
   onMapClick: () => void;
@@ -82,7 +83,6 @@ const DestinationPicker = ({
     <Box width="100%">
       <Flex justifyContent="space-between" alignItems="center">
         <Label>{label}</Label>
-        {/* 👇 座標セット済みならチェックマークを表示 */}
         {isLocationSet && (
           <span
             className={css({
@@ -102,7 +102,6 @@ const DestinationPicker = ({
             : {}
         }
       >
-        {/* 地図アイコンボタン */}
         <IconButton
           type="button"
           onClick={onMapClick}
@@ -112,7 +111,6 @@ const DestinationPicker = ({
           📍
         </IconButton>
 
-        {/* テキスト入力欄 */}
         <input
           type="text"
           placeholder="場所名 (例: 自宅, 東京駅)"
@@ -137,7 +135,6 @@ const DestinationPicker = ({
           }}
         />
 
-        {/* 検索ボタン */}
         <IconButton
           type="button"
           onClick={onSearch}
@@ -151,7 +148,6 @@ const DestinationPicker = ({
           🔍
         </IconButton>
       </InputContainer>
-      {/* 補足メッセージ: 座標取得済みなら名前変更OKと伝える */}
       {isLocationSet && (
         <div
           className={css({
@@ -169,7 +165,7 @@ const DestinationPicker = ({
 };
 
 // =================================================================
-// 🗺️ 2. Leaflet 設定 & モーダル
+// 🗺️ 2. Leaflet 設定 & モーダル (以前と同じ)
 // =================================================================
 
 const icon = L.icon({
@@ -403,7 +399,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 🕒 3. TimeRangeSelector (時刻選択)
+// 🕒 3. TimeRangeSelector (以前と同じ)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -479,7 +475,6 @@ const TimeRangeSelector = ({
 // 🚀 4. メイン画面 (HabitsPage & AddHabitModal)
 // =================================================================
 
-// データ型定義
 type Habit = {
   id: number;
   departure: string;
@@ -492,12 +487,52 @@ type Habit = {
   endTime: string;
 };
 
-// 初期データは空にする
-const initialHabits: Habit[] = [];
-
 function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>(initialHabits);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 💡 Clerkのフックでログイン情報を取得
+  const { user, isLoaded, isSignedIn } = useUser();
+
+  // ユーザーIDを使ってデータを取得する関数
+  const fetchHabitsForUser = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("habits")
+        .select("*")
+        .eq("user_id", userId) // 💡 文字列として検索できるようになります
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const formattedData: Habit[] = data.map((item: any) => ({
+          id: item.id,
+          departure: item.departure,
+          departureLat: item.departure_lat,
+          departureLng: item.departure_lng,
+          destination: item.destination,
+          destinationLat: item.destination_lat,
+          destinationLng: item.destination_lng,
+          startTime: item.start_time,
+          endTime: item.end_time,
+        }));
+        setHabits(formattedData);
+      }
+    } catch (error: any) {
+      console.error("データ取得エラー:", error.message);
+    }
+  };
+
+  // ユーザー情報がロードされたらデータを取得
+  useEffect(() => {
+    if (isLoaded && user) {
+      console.log("Clerk User ID:", user.id);
+      fetchHabitsForUser(user.id);
+    }
+  }, [isLoaded, user]);
 
   const handleBook = (habit: Habit) => {
     if (
@@ -509,11 +544,91 @@ function HabitsPage() {
     }
   };
 
-  const deleteHabit = (id: number) => {
-    if (confirm("このテンプレートを削除しますか？")) {
+  const deleteHabit = async (id: number) => {
+    if (!confirm("このテンプレートを削除しますか？")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("habits").delete().eq("id", id);
+      if (error) {
+        throw error;
+      }
       setHabits((prev) => prev.filter((h) => h.id !== id));
+    } catch (error: any) {
+      console.error("削除エラー:", error.message);
+      alert("削除に失敗しました");
     }
   };
+
+  const handleAddHabit = async (newHabitData: Omit<Habit, "id">) => {
+    if (!user) {
+      alert("サインインしてください");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("habits")
+        .insert([
+          {
+            user_id: user.id, // 💡 Clerkの文字列IDをそのまま保存
+            departure: newHabitData.departure,
+            departure_lat: newHabitData.departureLat,
+            departure_lng: newHabitData.departureLng,
+            destination: newHabitData.destination,
+            destination_lat: newHabitData.destinationLat,
+            destination_lng: newHabitData.destinationLng,
+            start_time: newHabitData.startTime,
+            end_time: newHabitData.endTime,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const addedHabit: Habit = {
+          id: data.id,
+          departure: data.departure,
+          departureLat: data.departure_lat,
+          departureLng: data.departure_lng,
+          destination: data.destination,
+          destinationLat: data.destination_lat,
+          destinationLng: data.destination_lng,
+          startTime: data.start_time,
+          endTime: data.end_time,
+        };
+        setHabits((prev) => [...prev, addedHabit]);
+      }
+    } catch (error: any) {
+      console.error("保存エラー:", error.message);
+      alert("保存に失敗しました: " + error.message);
+    }
+  };
+
+  // 読み込み中または未ログイン時の表示
+  if (!isLoaded) {
+    return (
+      <Box textAlign="center" py="10">
+        読み込み中...
+      </Box>
+    );
+  }
+
+  if (!isSignedIn || !user) {
+    return (
+      <Box textAlign="center" py="10">
+        <h2 className={css({ fontSize: "lg", fontWeight: "bold" })}>
+          サインインが必要です
+        </h2>
+        <p>習慣ルートを保存・表示するにはサインインしてください。</p>
+      </Box>
+    );
+  }
 
   return (
     <>
@@ -526,22 +641,16 @@ function HabitsPage() {
         p="4"
         pb="24"
       >
-        {/* ヘッダー */}
         <Flex alignItems="center" gap="4">
           <h1 className={css({ fontSize: "xl", fontWeight: "bold" })}>
             よく使うルート
           </h1>
         </Flex>
 
-        {/* 習慣リスト */}
         <Flex direction="column" gap="4">
           {habits.length === 0 ? (
             <Box textAlign="center" color="gray.500" py="10">
               登録されたルートはありません。
-              <br />
-              よく使うルートを登録して、
-              <br />
-              ワンタップで予約できるようにしましょう。
             </Box>
           ) : (
             habits.map((habit) => (
@@ -578,7 +687,6 @@ function HabitsPage() {
                     </Box>
                   </Flex>
 
-                  {/* 予約ボタン */}
                   <button
                     type="button"
                     onClick={() => handleBook(habit)}
@@ -622,7 +730,6 @@ function HabitsPage() {
         </Flex>
       </Flex>
 
-      {/* フローティング追加ボタン */}
       <button
         type="button"
         onClick={() => setIsModalOpen(true)}
@@ -647,13 +754,10 @@ function HabitsPage() {
         +
       </button>
 
-      {/* 新規追加モーダル */}
       {isModalOpen && (
         <AddHabitModal
           onClose={() => setIsModalOpen(false)}
-          onAdd={(newHabit) =>
-            setHabits([...habits, { ...newHabit, id: Date.now() }])
-          }
+          onAdd={handleAddHabit}
         />
       )}
     </>
@@ -666,7 +770,7 @@ function AddHabitModal({
   onAdd,
 }: {
   onClose: () => void;
-  onAdd: (habit: Omit<Habit, "id">) => void;
+  onAdd: (habit: Omit<Habit, "id">) => Promise<void>;
 }) {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
@@ -674,6 +778,7 @@ function AddHabitModal({
   const [targetField, setTargetField] = useState<
     "departure" | "destination" | null
   >(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [departureName, setDepartureName] = useState("");
   const [departureCoords, setDepartureCoords] = useState<{
@@ -744,10 +849,10 @@ function AddHabitModal({
     setIsMapOpen(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 👇 [修正] ここで座標チェックを行う
+    // 座標チェック
     if (!departureCoords || !destinationCoords) {
       alert(
         "出発地または目的地の位置情報が設定されていません。\n「🔍」ボタンを押して検索するか、「📍」ボタンで地図から場所を選択してください。",
@@ -760,17 +865,24 @@ function AddHabitModal({
       return;
     }
 
-    onAdd({
-      departure: departureName,
-      departureLat: departureCoords?.lat,
-      departureLng: departureCoords?.lng,
-      destination: destinationName,
-      destinationLat: destinationCoords?.lat,
-      destinationLng: destinationCoords?.lng,
-      startTime,
-      endTime,
-    });
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onAdd({
+        departure: departureName,
+        departureLat: departureCoords?.lat,
+        departureLng: departureCoords?.lng,
+        destination: destinationName,
+        destinationLat: destinationCoords?.lat,
+        destinationLng: destinationCoords?.lng,
+        startTime,
+        endTime,
+      });
+      onClose();
+    } catch (e) {
+      // エラーハンドリングは親で行うためここはfinallyのみ
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getCurrentModalCoords = () => {
@@ -836,7 +948,7 @@ function AddHabitModal({
               <DestinationPicker
                 label="出発地"
                 value={departureName}
-                isLocationSet={!!departureCoords} // 座標があるか渡す
+                isLocationSet={!!departureCoords}
                 onChange={setDepartureName}
                 onMapClick={() => openMap("departure")}
                 onSearch={() => handleSearch("departure", departureName)}
@@ -847,7 +959,7 @@ function AddHabitModal({
               <DestinationPicker
                 label="目的地"
                 value={destinationName}
-                isLocationSet={!!destinationCoords} // 座標があるか渡す
+                isLocationSet={!!destinationCoords}
                 onChange={setDestinationName}
                 onMapClick={() => openMap("destination")}
                 onSearch={() => handleSearch("destination", destinationName)}
@@ -880,22 +992,20 @@ function AddHabitModal({
               </button>
               <button
                 type="submit"
-                // 座標がない場合はグレーアウトさせることもできますが、
-                // あえて押させてエラーメッセージを出す方が親切な場合もあります。
-                // 今回は通常のスタイルですが、押すとエラーが出ます。
+                disabled={isSubmitting}
                 className={css({
                   flex: 1,
                   padding: "3",
                   borderRadius: "md",
-                  bg: "primary",
+                  bg: isSubmitting ? "gray.400" : "primary",
                   color: "white",
                   fontWeight: "bold",
-                  cursor: "pointer",
+                  cursor: isSubmitting ? "wait" : "pointer",
                   transition: "background 0.2s",
-                  _hover: { bg: "secondary" },
+                  _hover: { bg: isSubmitting ? "gray.400" : "secondary" },
                 })}
               >
-                保存
+                {isSubmitting ? "保存中..." : "保存"}
               </button>
             </Flex>
           </form>
