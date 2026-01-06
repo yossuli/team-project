@@ -1,8 +1,8 @@
 "use client";
 
-import { createLazyFileRoute } from "@tanstack/react-router";
-// 👇 追加: Clerkと同期関数をインポート
+// 👇 Clerkと同期関数
 import { useUser } from "@clerk/clerk-react";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { syncUserToSupabase } from "../utils/syncUser";
 
 import L from "leaflet";
@@ -22,7 +22,7 @@ export const Route = createLazyFileRoute("/")({
 });
 
 // =================================================================
-// 1. DestinationPicker (テキスト入力 & 検索ボタン)
+// 1. DestinationPicker (変更なし)
 // =================================================================
 
 const Label = styled("label", {
@@ -159,7 +159,7 @@ export const DestinationPicker = ({
 };
 
 // =================================================================
-// 2. Leaflet 設定 & モーダル
+// 2. Leaflet 設定 & モーダル (変更なし)
 // =================================================================
 
 const icon = L.icon({
@@ -389,7 +389,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. TimeRangeSelector
+// 3. DepartureTimeSelector (新しい時間選択コンポーネント)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -416,12 +416,21 @@ const TimeLabel = styled("label", {
     marginBottom: "8px",
   },
 });
-const TimeRangeSelector = ({
-  startTime,
-  endTime,
-  onChangeStart,
-  onChangeEnd,
-}: any) => {
+
+interface DepartureTimeSelectorProps {
+  departureTime: string;
+  tolerance: number;
+  onChangeTime: (val: string) => void;
+  onChangeTolerance: (val: number) => void;
+}
+
+const DepartureTimeSelector = ({
+  departureTime,
+  tolerance,
+  onChangeTime,
+  onChangeTolerance,
+}: DepartureTimeSelectorProps) => {
+  // 15分刻みの時間リスト
   const timeOptions = useMemo(() => {
     const options = [];
     for (let h = 0; h < 24; h++) {
@@ -433,30 +442,37 @@ const TimeRangeSelector = ({
     }
     return options;
   }, []);
+
+  // 許容範囲のオプション (分)
+  const toleranceOptions = [0, 15, 30, 45, 60, 90, 120];
+
   return (
     <Flex gap="4" width="100%">
+      {/* 出発時刻 */}
       <Box flex="1">
-        <TimeLabel>開始時刻</TimeLabel>
+        <TimeLabel>出発希望時刻</TimeLabel>
         <Select
-          value={startTime}
-          onChange={(e) => onChangeStart(e.target.value)}
+          value={departureTime}
+          onChange={(e) => onChangeTime(e.target.value)}
         >
           {timeOptions.map((t) => (
-            <option key={`s-${t}`} value={t}>
+            <option key={`t-${t}`} value={t}>
               {t}
             </option>
           ))}
         </Select>
       </Box>
-      <Box display="flex" alignItems="center" paddingTop="24px" color="#999">
-        ～
-      </Box>
+
+      {/* 許容範囲 */}
       <Box flex="1">
-        <TimeLabel>終了時刻</TimeLabel>
-        <Select value={endTime} onChange={(e) => onChangeEnd(e.target.value)}>
-          {timeOptions.map((t) => (
-            <option key={`e-${t}`} value={t}>
-              {t}
+        <TimeLabel>許容範囲 (前後)</TimeLabel>
+        <Select
+          value={tolerance}
+          onChange={(e) => onChangeTolerance(Number(e.target.value))}
+        >
+          {toleranceOptions.map((m) => (
+            <option key={`tol-${m}`} value={m}>
+              {m === 0 ? "指定時刻のみ" : `± ${m} 分`}
             </option>
           ))}
         </Select>
@@ -469,19 +485,18 @@ const TimeRangeSelector = ({
 // 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
 // =================================================================
 function RegistrationScreen() {
-  // 👇 追加: Clerkのユーザー情報を取得してSupabaseに同期する処理
   const { user, isLoaded } = useUser();
 
   useEffect(() => {
     if (isLoaded && user) {
-      // 画面読み込み時にユーザー同期を実行
       syncUserToSupabase(user);
     }
   }, [isLoaded, user]);
-  // 👆 追加ここまで
 
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  // 👇 変更: stateを「出発時刻」と「許容範囲」に変更
+  const [departureTime, setDepartureTime] = useState("09:00");
+  const [tolerance, setTolerance] = useState(30); // デフォルト30分
+
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [targetField, setTargetField] = useState<
     "departure" | "destination" | null
@@ -569,28 +584,29 @@ function RegistrationScreen() {
       );
       return;
     }
+
+    // 👇 ログ出力も変更
     console.log("登録データ:", {
       departure: { name: departureName, ...departureCoords },
       destination: { name: destinationName, ...destinationCoords },
-      startTime,
-      endTime,
+      departureTime, // 出発時刻
+      tolerance, // 許容範囲
     });
-    alert("登録が完了しました！(モック)");
+    alert(`登録しました！\n出発: ${departureTime} (±${tolerance}分)`);
   };
 
   return (
-    // 👇 レイアウト制御の肝部分
     <Flex
       direction="column"
       align="center"
-      justify="space-evenly" // 均等配置で画面内に収める
-      height="calc(100dvh - 74px)" // ヘッダー分(約74px)を引いてスクロール回避
+      justify="space-evenly"
+      height="calc(100dvh - 74px)"
       width="100%"
       maxWidth="400px"
       mx="auto"
       px="4"
       pb="4"
-      overflow="hidden" // はみ出し防止
+      overflow="hidden"
     >
       <Box width="100%">
         <h1
@@ -627,11 +643,12 @@ function RegistrationScreen() {
         </Box>
 
         <Box>
-          <TimeRangeSelector
-            startTime={startTime}
-            endTime={endTime}
-            onChangeStart={setStartTime}
-            onChangeEnd={setEndTime}
+          {/* 👇 新しい時間選択コンポーネントを使用 */}
+          <DepartureTimeSelector
+            departureTime={departureTime}
+            tolerance={tolerance}
+            onChangeTime={setDepartureTime}
+            onChangeTolerance={setTolerance}
           />
         </Box>
       </Box>
