@@ -1,17 +1,20 @@
+import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "../utils/supabase";
 
 export const Route = createLazyFileRoute("/matching-history")({
   component: MatchingHistoryPage,
 });
 
-// データ型の定義 (APIのレスポンスに合わせる)
+// データ型の定義
 type HistoryItem = {
-  id: number;
+  id: number; // グループIDなどを便宜的に使用
   date: string;
   partner: string;
+  partnerId: string; // ブロック用にIDを持たせる
   partnerIcon: string;
   route: string;
   status: string;
@@ -21,46 +24,129 @@ type HistoryItem = {
 };
 
 function MatchingHistoryPage() {
-  // モックデータの代わりに、空の配列で初期化
+  const { user: currentUser, isLoaded } = useUser();
   const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<HistoryItem | null>(
     null,
   );
-  const [isLoading, setIsLoading] = useState(true); // ローディング状態
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 👇 画面が表示されたらAPIからデータを取得する
+  // 画面表示時にSupabaseからデータを取得
   useEffect(() => {
     const fetchHistory = async () => {
+      if (!isLoaded || !currentUser) {
+        return;
+      }
+
       try {
-        const res = await fetch("/api/history"); // APIを叩く
-        if (res.ok) {
-          const data = await res.json();
-          setHistoryList(data); // データをセット
-        } else {
-          console.error("Failed to fetch history");
+        // 1. まず、自分が参加しているグループのIDを取得
+        const { data: myParticipations, error: myError } = await supabase
+          .from("ride_group_participants")
+          .select("group_id, reservation:reservations(destination_location)") // 予約情報から目的地などを取得
+          .eq("user_id", currentUser.id);
+
+        if (myError) {
+          throw myError;
+        }
+
+        if (!myParticipations || myParticipations.length === 0) {
+          setHistoryList([]);
+          return;
+        }
+
+        const myGroupIds = myParticipations.map((p) => p.group_id);
+
+        // 2. そのグループに参加している「自分以外」のユーザーを取得
+        const { data: partners, error: partnerError } = await supabase
+          .from("ride_group_participants")
+          .select(`
+            group_id,
+            user:users (
+              id, nickname, icon_image_url, bio, habitual_route
+            ),
+            group:ride_groups (
+              created_at, status
+            )
+          `)
+          .in("group_id", myGroupIds)
+          .neq("user_id", currentUser.id); // 自分を除外
+
+        if (partnerError) {
+          throw partnerError;
+        }
+
+        // 3. データを整形
+        if (partners) {
+          const formattedData: HistoryItem[] = partners.map((item: any) => {
+            // 自分の参加情報からルート名（目的地）を探す（簡易的）
+            const myInfo = myParticipations.find(
+              (p) => p.group_id === item.group_id,
+            );
+            const routeName = myInfo?.reservation?.destination_location
+              ? `${myInfo.reservation.destination_location} への相乗り`
+              : "詳細不明なルート";
+
+            return {
+              id: item.group_id, // グループIDをキーにする
+              date: item.group.created_at,
+              partner: item.user.nickname || "No Name",
+              partnerId: item.user.id,
+              partnerIcon: item.user.icon_image_url,
+              route: routeName,
+              status:
+                item.group.status === "completed" ? "completed" : "matched",
+              habitualRoute: item.user.habitual_route || "未設定",
+              bio: item.user.bio || "自己紹介はありません",
+              isBlocked: false, // 初期値（あとで判定も可能だが一旦false）
+            };
+          });
+          setHistoryList(formattedData);
         }
       } catch (error) {
-        console.error("Error:", error);
+        console.error("Error fetching history:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchHistory();
-  }, []);
+  }, [isLoaded, currentUser]);
 
-  const handleBlock = (id: number, partnerName: string) => {
+  // ブロック処理
+  const handleBlock = async (
+    groupId: number,
+    partnerId: string,
+    partnerName: string,
+  ) => {
+    if (!currentUser) {
+      return;
+    }
+
     if (confirm(`${partnerName}さんをブロックしますか？`)) {
-      // (TODO: ここで本来はブロックAPIを叩く)
-      setHistoryList((prevList) =>
-        prevList.map((item) =>
-          item.id === id ? { ...item, isBlocked: true } : item,
-        ),
-      );
+      try {
+        // Supabaseのblocksテーブルに追加
+        const { error } = await supabase
+          .from("blocks")
+          .insert([{ blocker_id: currentUser.id, blocked_id: partnerId }]);
+
+        if (error) {
+          throw error;
+        }
+
+        // 画面上の表示を「ブロック済み」に更新
+        setHistoryList((prevList) =>
+          prevList.map((item) =>
+            item.id === groupId ? { ...item, isBlocked: true } : item,
+          ),
+        );
+        alert("ブロックしました");
+      } catch (e: any) {
+        console.error("Block error:", e);
+        alert("ブロックに失敗しました: " + e.message);
+      }
     }
   };
 
-  // ローディング中の表示
   if (isLoading) {
     return (
       <Flex justify="center" p="10">
@@ -69,6 +155,7 @@ function MatchingHistoryPage() {
     );
   }
 
+  // (以下、JSX部分は変更なし。そのままreturnしてください)
   return (
     <>
       <Flex
@@ -89,13 +176,11 @@ function MatchingHistoryPage() {
           マッチング履歴
         </h1>
 
-        {/* データがない場合の表示 */}
         {historyList.length === 0 ? (
           <Box textAlign="center" color="gray.500">
             マッチング履歴はありません
           </Box>
         ) : (
-          /* 履歴リスト */
           <Flex direction="column" gap="4">
             {historyList.map((item) => (
               <div
@@ -108,10 +193,8 @@ function MatchingHistoryPage() {
                   boxShadow: "sm",
                 })}
               >
-                {/* 上段：日付とステータス */}
                 <Flex justifyContent="space-between" alignItems="center" mb="3">
                   <span className={css({ fontSize: "sm", color: "gray.500" })}>
-                    {/* 日付のフォーマット (簡易) */}
                     {new Date(item.date).toLocaleDateString()}
                   </span>
                   <span
@@ -130,14 +213,12 @@ function MatchingHistoryPage() {
                   </span>
                 </Flex>
 
-                {/* 中段：ルート情報 */}
                 <Box fontSize="lg" fontWeight="bold" mb="4">
                   {item.route}
                 </Box>
 
                 <hr className={css({ borderColor: "gray.200", mb: "3" })} />
 
-                {/* 下段：相手の情報とブロックボタン */}
                 <Flex alignItems="center" justifyContent="space-between">
                   <Flex
                     alignItems="center"
@@ -174,7 +255,6 @@ function MatchingHistoryPage() {
                     </Flex>
                   </Flex>
 
-                  {/* ブロックボタン */}
                   {item.isBlocked ? (
                     <button
                       type="button"
@@ -197,7 +277,7 @@ function MatchingHistoryPage() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleBlock(item.id, item.partner);
+                        handleBlock(item.id, item.partnerId, item.partner);
                       }}
                       className={css({
                         border: "1px solid token(colors.red.500)",
@@ -224,7 +304,6 @@ function MatchingHistoryPage() {
         )}
       </Flex>
 
-      {/* 相手情報モーダル */}
       {selectedPartner && (
         <PartnerInfoModal
           partner={selectedPartner}
@@ -235,12 +314,12 @@ function MatchingHistoryPage() {
   );
 }
 
-// --- 👤 相手情報詳細モーダル ---
+// (以下、PartnerInfoModal は変更なしのため省略)
 function PartnerInfoModal({
   partner,
   onClose,
 }: {
-  partner: HistoryItem; // 型をHistoryItemに変更
+  partner: HistoryItem;
   onClose: () => void;
 }) {
   return (
