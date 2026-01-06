@@ -1,3 +1,5 @@
+"use client";
+
 import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex, styled } from "@ss/jsx";
@@ -12,6 +14,8 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+// 👇 マッチングロジックをインポート
+import { findBestMatch } from "../utils/matching";
 import { supabase } from "../utils/supabase";
 
 export const Route = createLazyFileRoute("/habits")({
@@ -19,9 +23,9 @@ export const Route = createLazyFileRoute("/habits")({
 });
 
 // =================================================================
-// 📍 1. DestinationPicker (省略 - 以前と同じ)
+// 📍 1. DestinationPicker (省略 - 変更なし)
 // =================================================================
-// ※ 元のコードのDestinationPickerと同じものをここに置いてください
+// ※ トップページと同じコンポーネント
 const Label = styled("label", {
   base: {
     display: "block",
@@ -31,7 +35,6 @@ const Label = styled("label", {
     marginBottom: "8px",
   },
 });
-
 const InputContainer = styled("div", {
   base: {
     display: "flex",
@@ -48,7 +51,6 @@ const InputContainer = styled("div", {
     },
   },
 });
-
 const IconButton = styled("button", {
   base: {
     display: "flex",
@@ -62,7 +64,6 @@ const IconButton = styled("button", {
     fontSize: "18px",
   },
 });
-
 interface DestinationPickerProps {
   label?: string;
   value: string;
@@ -71,7 +72,6 @@ interface DestinationPickerProps {
   onSearch: () => void;
   onMapClick: () => void;
 }
-
 const DestinationPicker = ({
   label = "目的地を選択",
   value,
@@ -149,7 +149,7 @@ const DestinationPicker = ({
 };
 
 // =================================================================
-// 🗺️ 2. Leaflet 設定 (省略 - 以前と同じ)
+// 🗺️ 2. Leaflet 設定 (省略 - 変更なし)
 // =================================================================
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -161,7 +161,6 @@ const icon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
-
 const ChangeView = ({ center }: { center: { lat: number; lng: number } }) => {
   const map = useMap();
   useEffect(() => {
@@ -169,7 +168,6 @@ const ChangeView = ({ center }: { center: { lat: number; lng: number } }) => {
   }, [center, map]);
   return null;
 };
-
 const MapClickHandler = ({ onLocationSelect }: any) => {
   useMapEvents({
     click(e) {
@@ -178,7 +176,6 @@ const MapClickHandler = ({ onLocationSelect }: any) => {
   });
   return null;
 };
-
 const ModalOverlay = styled("div", {
   base: {
     position: "fixed",
@@ -192,7 +189,6 @@ const ModalOverlay = styled("div", {
     padding: "20px",
   },
 });
-
 const ModalContent = styled("div", {
   base: {
     backgroundColor: "white",
@@ -206,7 +202,6 @@ const ModalContent = styled("div", {
     animation: "fadeIn 0.2s ease-out",
   },
 });
-
 const MapModal = ({
   isOpen,
   onClose,
@@ -219,13 +214,11 @@ const MapModal = ({
     lng: number;
   } | null>(null);
   const defaultCenter = { lat: 35.681236, lng: 139.767125 };
-
   useEffect(() => {
     if (isOpen) {
       setMarkerPosition(initialPosition || null);
     }
   }, [isOpen, initialPosition]);
-
   const handleConfirm = async () => {
     if (!markerPosition) {
       return;
@@ -245,7 +238,6 @@ const MapModal = ({
       alert("住所取得エラー");
     }
   };
-
   if (!isOpen) {
     return null;
   }
@@ -295,7 +287,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. DepartureTimeSelector (index.lazy.tsxと同じもの)
+// 3. DepartureTimeSelector (省略 - 変更なし)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -318,20 +310,12 @@ const TimeLabel = styled("label", {
     marginBottom: "8px",
   },
 });
-
-interface DepartureTimeSelectorProps {
-  departureTime: string;
-  tolerance: number;
-  onChangeTime: (val: string) => void;
-  onChangeTolerance: (val: number) => void;
-}
-
 const DepartureTimeSelector = ({
   departureTime,
   tolerance,
   onChangeTime,
   onChangeTolerance,
-}: DepartureTimeSelectorProps) => {
+}: any) => {
   const timeOptions = useMemo(() => {
     const options = [];
     for (let h = 0; h < 24; h++) {
@@ -343,16 +327,14 @@ const DepartureTimeSelector = ({
     }
     return options;
   }, []);
-
   const toleranceOptions = [0, 15, 30, 45, 60, 90, 120];
-
   return (
     <Flex gap="4" width="100%">
       <Box flex="1">
         <TimeLabel>出発希望時刻</TimeLabel>
         <Select
           value={departureTime}
-          onChange={(e) => onChangeTime(e.target.value)}
+          onChange={(e: any) => onChangeTime(e.target.value)}
         >
           {timeOptions.map((t) => (
             <option key={`t-${t}`} value={t}>
@@ -365,7 +347,7 @@ const DepartureTimeSelector = ({
         <TimeLabel>許容範囲 (前後)</TimeLabel>
         <Select
           value={tolerance}
-          onChange={(e) => onChangeTolerance(Number(e.target.value))}
+          onChange={(e: any) => onChangeTolerance(Number(e.target.value))}
         >
           {toleranceOptions.map((m) => (
             <option key={`tol-${m}`} value={m}>
@@ -390,15 +372,19 @@ type Habit = {
   destination: string;
   destinationLat?: number;
   destinationLng?: number;
-  startTime: string; // "09:00" (DBのstart_time列を使用)
-  tolerance: number; // 30 (DBのtolerance列を使用)
+  startTime: string;
+  tolerance: number;
 };
 
 function HabitsPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedHabitToBook, setSelectedHabitToBook] = useState<Habit | null>(
+    null,
+  ); // 予約確認用
   const { user, isLoaded, isSignedIn } = useUser();
 
+  // データ取得
   const fetchHabitsForUser = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -410,7 +396,6 @@ function HabitsPage() {
       if (error) {
         throw error;
       }
-
       if (data) {
         const formattedData: Habit[] = data.map((item: any) => ({
           id: item.id,
@@ -420,8 +405,8 @@ function HabitsPage() {
           destination: item.destination,
           destinationLat: item.destination_lat,
           destinationLng: item.destination_lng,
-          startTime: item.start_time, // DB列名はstart_timeのまま
-          tolerance: item.tolerance || 0, // 新しいカラム
+          startTime: item.start_time,
+          tolerance: item.tolerance || 0,
         }));
         setHabits(formattedData);
       }
@@ -435,16 +420,6 @@ function HabitsPage() {
       fetchHabitsForUser(user.id);
     }
   }, [isLoaded, user]);
-
-  const handleBook = (habit: Habit) => {
-    if (
-      confirm(
-        `以下の内容で予約を作成しますか？\n\n場所: ${habit.departure} → ${habit.destination}\n時間: ${habit.startTime} (±${habit.tolerance}分)`,
-      )
-    ) {
-      alert("予約リクエストを送信しました！");
-    }
-  };
 
   const deleteHabit = async (id: number) => {
     if (!confirm("このテンプレートを削除しますか？")) {
@@ -466,7 +441,6 @@ function HabitsPage() {
       alert("サインインしてください");
       return;
     }
-
     try {
       const { data, error } = await supabase
         .from("habits")
@@ -479,8 +453,8 @@ function HabitsPage() {
             destination: newHabitData.destination,
             destination_lat: newHabitData.destinationLat,
             destination_lng: newHabitData.destinationLng,
-            start_time: newHabitData.startTime, // 出発時刻
-            tolerance: newHabitData.tolerance, // 許容範囲
+            start_time: newHabitData.startTime,
+            tolerance: newHabitData.tolerance,
           },
         ])
         .select()
@@ -489,7 +463,6 @@ function HabitsPage() {
       if (error) {
         throw error;
       }
-
       if (data) {
         setHabits((prev) => [
           ...prev,
@@ -580,9 +553,10 @@ function HabitsPage() {
                       {habit.departure} → {habit.destination}
                     </Box>
                   </Flex>
+                  {/* 👇 登録ボタンを押すと日付選択モーダルを開く */}
                   <button
                     type="button"
-                    onClick={() => handleBook(habit)}
+                    onClick={() => setSelectedHabitToBook(habit)}
                     className={css({
                       bg: "primary",
                       color: "white",
@@ -640,17 +614,241 @@ function HabitsPage() {
       >
         +
       </button>
+
+      {/* 新規追加モーダル */}
       {isModalOpen && (
         <AddHabitModal
           onClose={() => setIsModalOpen(false)}
           onAdd={handleAddHabit}
         />
       )}
+
+      {/* 👇 【新規】予約確認・日付選択モーダル */}
+      {selectedHabitToBook && (
+        <BookingConfirmModal
+          habit={selectedHabitToBook}
+          onClose={() => setSelectedHabitToBook(null)}
+          userId={user.id}
+        />
+      )}
     </>
   );
 }
 
-// --- 📝 新規追加モーダル ---
+// =================================================================
+// 📅 5. 予約確認モーダル (ここから実際にマッチングを呼び出す)
+// =================================================================
+function BookingConfirmModal({
+  habit,
+  onClose,
+  userId,
+}: { habit: Habit; onClose: () => void; userId: string }) {
+  const [targetDate, setTargetDate] = useState(
+    new Date().toISOString().split("T")[0],
+  ); // デフォルト今日
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!habit.departureLat || !habit.destinationLat) {
+      alert("座標情報が不足しているため予約できません");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // 1. リクエストデータ作成
+      const requestData = {
+        departure: {
+          name: habit.departure,
+          lat: habit.departureLat,
+          lng: habit.departureLng!,
+        },
+        destination: {
+          name: habit.destination,
+          lat: habit.destinationLat,
+          lng: habit.destinationLng!,
+        },
+        targetDate,
+        departureTime: habit.startTime,
+        tolerance: habit.tolerance,
+      };
+
+      console.log("習慣からマッチング開始:", requestData);
+
+      // 2. マッチング実行
+      const result = await findBestMatch(requestData, userId);
+
+      if (result.isMatch) {
+        // マッチング成功
+        const partnerName =
+          result.partnerReservation.user?.nickname || "ユーザー";
+        if (
+          confirm(
+            `✨ マッチング候補が見つかりました！\n相手: ${partnerName}\nスコア: ${Math.floor((result.score || 0) * 100)}点\n\n相乗りしますか？`,
+          )
+        ) {
+          alert("マッチング成立！(モック)");
+        } else {
+          await saveNewReservation(requestData, userId);
+        }
+      } else {
+        // マッチングなし -> 新規予約
+        console.log("マッチングなし:", result.message);
+        await saveNewReservation(requestData, userId);
+      }
+      onClose(); // 閉じる
+    } catch (e: any) {
+      console.error("Error:", e);
+      alert("エラーが発生しました");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const saveNewReservation = async (req: any, uid: string) => {
+    const { error } = await supabase.from("reservations").insert([
+      {
+        user_id: uid,
+        departure_location: req.departure.name,
+        departure_lat: req.departure.lat,
+        departure_lng: req.departure.lng,
+        destination_location: req.destination.name,
+        destination_lat: req.destination.lat,
+        destination_lng: req.destination.lng,
+        target_date: req.targetDate,
+        start_time: req.departureTime,
+        tolerance: req.tolerance,
+        status: "active",
+      },
+    ]);
+    if (error) {
+      throw error;
+    }
+    alert("条件に合う相手がいなかったため、\n新規の予約として登録しました。");
+  };
+
+  return (
+    <div
+      className={css({
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        bg: "rgba(0,0,0,0.5)",
+        zIndex: 200,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "4",
+      })}
+      onClick={onClose}
+    >
+      <div
+        className={css({
+          bg: "white",
+          width: "100%",
+          maxWidth: "350px",
+          borderRadius: "lg",
+          padding: "6",
+          boxShadow: "lg",
+        })}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2
+          className={css({
+            fontSize: "lg",
+            fontWeight: "bold",
+            mb: "4",
+            textAlign: "center",
+          })}
+        >
+          予約の確認
+        </h2>
+
+        <Box mb="4">
+          <p className={css({ fontSize: "sm", color: "gray.600", mb: "1" })}>
+            ルート:
+          </p>
+          <p className={css({ fontWeight: "bold" })}>
+            {habit.departure} → {habit.destination}
+          </p>
+        </Box>
+        <Box mb="4">
+          <p className={css({ fontSize: "sm", color: "gray.600", mb: "1" })}>
+            時間:
+          </p>
+          <p className={css({ fontWeight: "bold" })}>
+            {habit.startTime} (±{habit.tolerance}分)
+          </p>
+        </Box>
+
+        <Box mb="6">
+          <label
+            className={css({
+              display: "block",
+              fontSize: "sm",
+              fontWeight: "bold",
+              mb: "2",
+              color: "blue.600",
+            })}
+          >
+            いつの予約にしますか？
+          </label>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            className={css({
+              width: "100%",
+              padding: "3",
+              border: "2px solid token(colors.blue.100)",
+              borderRadius: "md",
+              fontSize: "lg",
+              fontWeight: "bold",
+              color: "gray.800",
+              outline: "none",
+              _focus: { borderColor: "blue.500" },
+            })}
+          />
+        </Box>
+
+        <Flex gap="3">
+          <button
+            onClick={onClose}
+            className={css({
+              flex: 1,
+              padding: "3",
+              borderRadius: "md",
+              bg: "gray.200",
+              fontWeight: "bold",
+              cursor: "pointer",
+            })}
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={isProcessing}
+            className={css({
+              flex: 1,
+              padding: "3",
+              borderRadius: "md",
+              bg: "primary",
+              color: "white",
+              fontWeight: "bold",
+              cursor: isProcessing ? "wait" : "pointer",
+            })}
+          >
+            {isProcessing ? "処理中..." : "予約する"}
+          </button>
+        </Flex>
+      </div>
+    </div>
+  );
+}
+
+// (AddHabitModal は変更なしのため省略 - 以前と同じものを使ってください)
 function AddHabitModal({
   onClose,
   onAdd,
@@ -658,14 +856,14 @@ function AddHabitModal({
   onClose: () => void;
   onAdd: (habit: Omit<Habit, "id">) => Promise<void>;
 }) {
+  // ... (以前のAddHabitModalコードをそのまま使用)
   const [startTime, setStartTime] = useState("09:00");
-  const [tolerance, setTolerance] = useState(30); // 許容範囲
+  const [tolerance, setTolerance] = useState(30);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [targetField, setTargetField] = useState<
     "departure" | "destination" | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [departureName, setDepartureName] = useState("");
   const [departureCoords, setDepartureCoords] = useState<{
     lat: number;
@@ -681,13 +879,11 @@ function AddHabitModal({
     setTargetField(field);
     setIsMapOpen(true);
   };
-
-  // (検索・地図ロジック省略 - index.lazy.tsxと同じ)
-  // ※ 実際の実装では共通化するか、index.lazy.tsxのロジックをコピーしてください
-  // ここでは省略していますが、必ずコピーして実装してください
   const handleSearch = async (field: any, query: any) => {
-    /* ... */
+    /* ...省略... */
   };
+  // ※ ここは前回のコードと同じ実装を入れてください。
+  // ...
   const handleLocationSelect = (data: any) => {
     if (targetField === "departure") {
       setDepartureName(data.address);
@@ -720,7 +916,6 @@ function AddHabitModal({
         destinationLng: destinationCoords?.lng,
         startTime,
         tolerance,
-        endTime: "", // 互換性のため空文字
       });
       onClose();
     } finally {
@@ -797,7 +992,6 @@ function AddHabitModal({
               />
             </Box>
             <Box mb="4">
-              {/* 👇 新しい時間選択 */}
               <DepartureTimeSelector
                 departureTime={startTime}
                 tolerance={tolerance}

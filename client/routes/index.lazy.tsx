@@ -5,6 +5,10 @@ import { useUser } from "@clerk/clerk-react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { syncUserToSupabase } from "../utils/syncUser";
 
+// 👇 マッチング関連のインポート
+import { findBestMatch } from "../utils/matching";
+import { supabase } from "../utils/supabase";
+
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
@@ -389,7 +393,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. DepartureTimeSelector (新しい時間選択コンポーネント)
+// 3. DepartureTimeSelector (変更なし)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -430,7 +434,6 @@ const DepartureTimeSelector = ({
   onChangeTime,
   onChangeTolerance,
 }: DepartureTimeSelectorProps) => {
-  // 15分刻みの時間リスト
   const timeOptions = useMemo(() => {
     const options = [];
     for (let h = 0; h < 24; h++) {
@@ -443,7 +446,6 @@ const DepartureTimeSelector = ({
     return options;
   }, []);
 
-  // 許容範囲のオプション (分)
   const toleranceOptions = [0, 15, 30, 45, 60, 90, 120];
 
   return (
@@ -482,7 +484,7 @@ const DepartureTimeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
+// 4. メイン画面 (検索＆登録ロジック) - 日付追加版
 // =================================================================
 function RegistrationScreen() {
   const { user, isLoaded } = useUser();
@@ -493,9 +495,13 @@ function RegistrationScreen() {
     }
   }, [isLoaded, user]);
 
-  // 👇 変更: stateを「出発時刻」と「許容範囲」に変更
+  // 👇 変更1: 日付stateを追加 (初期値: 今日)
+  const [targetDate, setTargetDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+
   const [departureTime, setDepartureTime] = useState("09:00");
-  const [tolerance, setTolerance] = useState(30); // デフォルト30分
+  const [tolerance, setTolerance] = useState(30);
 
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [targetField, setTargetField] = useState<
@@ -573,7 +579,8 @@ function RegistrationScreen() {
     return null;
   };
 
-  const handleRegister = () => {
+  // 👇 登録＆マッチング実行ボタン
+  const handleRegister = async () => {
     if (!departureName || !destinationName) {
       alert("出発地と目的地を入力してください");
       return;
@@ -585,14 +592,84 @@ function RegistrationScreen() {
       return;
     }
 
-    // 👇 ログ出力も変更
-    console.log("登録データ:", {
+    if (!user) {
+      alert("サインインしてください");
+      return;
+    }
+
+    // 1. マッチング用のリクエストデータを作成 (日付を追加)
+    const requestData = {
       departure: { name: departureName, ...departureCoords },
       destination: { name: destinationName, ...destinationCoords },
-      departureTime, // 出発時刻
-      tolerance, // 許容範囲
-    });
-    alert(`登録しました！\n出発: ${departureTime} (±${tolerance}分)`);
+      targetDate, // 👈 日付を追加
+      departureTime,
+      tolerance,
+    };
+
+    console.log("マッチング開始...", requestData);
+
+    try {
+      // 2. マッチングアルゴリズムを実行
+      const result = await findBestMatch(requestData, user.id);
+
+      if (result.isMatch) {
+        // --- パターンB: マッチング成立 ---
+        const partnerName =
+          result.partnerReservation.user?.nickname || "ユーザー";
+        if (
+          confirm(
+            `✨ マッチング候補が見つかりました！\n\n` +
+              `日付: ${result.partnerReservation.target_date}\n` +
+              `相手: ${partnerName} さん\n` +
+              `相乗りスコア: ${Math.floor((result.score || 0) * 100)}点\n` +
+              `------------------\n` +
+              `この人と相乗りしますか？`,
+          )
+        ) {
+          // OKなら本来はride_groups等を作成するが、今回はモック
+          alert("マッチング成立！(モック)");
+        } else {
+          // 拒否なら新規予約として登録
+          await saveNewReservation(requestData, user.id);
+        }
+      } else {
+        // --- パターンA: マッチングなし ---
+        console.log("マッチングなし:", result.message);
+        await saveNewReservation(requestData, user.id);
+      }
+    } catch (e) {
+      console.error("Error:", e);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // 予約を新規登録するヘルパー関数
+  const saveNewReservation = async (req: any, userId: string) => {
+    try {
+      const { error } = await supabase.from("reservations").insert([
+        {
+          user_id: userId,
+          departure_location: req.departure.name,
+          departure_lat: req.departure.lat,
+          departure_lng: req.departure.lng,
+          destination_location: req.destination.name,
+          destination_lat: req.destination.lat,
+          destination_lng: req.destination.lng,
+          target_date: req.targetDate, // 👈 DB保存に追加
+          start_time: req.departureTime,
+          tolerance: req.tolerance,
+          status: "active",
+        },
+      ]);
+      if (error) {
+        throw error;
+      }
+      alert(
+        "条件に合う相手がいなかったため、\n新規の予約として登録しました。\n(マイページで確認できます)",
+      );
+    } catch (e: any) {
+      alert("保存に失敗しました: " + e.message);
+    }
   };
 
   return (
@@ -642,8 +719,26 @@ function RegistrationScreen() {
           />
         </Box>
 
+        {/* 👇 変更2: 日付選択コンポーネントを追加 */}
+        <Box mb="2">
+          <TimeLabel>日付</TimeLabel>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "16px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              backgroundColor: "white",
+              outline: "none",
+            }}
+          />
+        </Box>
+
         <Box>
-          {/* 👇 新しい時間選択コンポーネントを使用 */}
           <DepartureTimeSelector
             departureTime={departureTime}
             tolerance={tolerance}
