@@ -5,32 +5,34 @@ export const syncUserToSupabase = async (clerkUser: any) => {
     return;
   }
 
-  // Clerkのユーザーオブジェクトから必要な情報を取り出す
-  const userId = clerkUser.id;
+  // Clerkから情報を取得
+  const id = clerkUser.id;
   const email = clerkUser.primaryEmailAddress?.emailAddress;
-  // 名前がない場合はメールの@より前を使うなどの工夫も可能ですが、一旦フルネームor名
-  const nickname = clerkUser.fullName || clerkUser.firstName || "No Name";
   const iconImageUrl = clerkUser.imageUrl;
 
+  // 👇 usernameを取得 (設定されていない場合はnull)
+  const username = clerkUser.username;
+
+  // 既存のニックネームロジック (usernameがなければフルネーム、なければメアド前部など)
+  const nickname =
+    username || clerkUser.fullName || email?.split("@")[0] || "No Name";
+
   try {
-    // upsert: データがあれば更新、なければ挿入
-    const { error } = await supabase.from("users").upsert(
-      {
-        id: userId,
-        email: email,
-        nickname: nickname,
-        icon_image_url: iconImageUrl,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" }, // IDが重複したら更新する設定
-    );
+    const { error } = await supabase.from("users").upsert({
+      id,
+      email,
+      nickname, // 従来のニックネーム (バックアップ用)
+      username, // 👈 【追加】Clerkのユーザー名
+      icon_image_url: iconImageUrl,
+      updated_at: new Date().toISOString(),
+    });
 
     if (error) {
-      console.error("ユーザー同期エラー:", error.message);
+      console.error("Supabase user sync error:", error);
     } else {
-      console.log("ユーザー情報をSupabaseに同期しました");
+      console.log("User synced:", username || nickname);
     }
-  } catch (err) {
-    console.error("予期せぬエラー:", err);
+  } catch (e) {
+    console.error("Sync failed:", e);
   }
 };
