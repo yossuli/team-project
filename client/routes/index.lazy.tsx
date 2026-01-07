@@ -1,9 +1,13 @@
 "use client";
 
-import { createLazyFileRoute } from "@tanstack/react-router";
-// 👇 追加: Clerkと同期関数をインポート
+// 👇 Clerkと同期関数
 import { useUser } from "@clerk/clerk-react";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { syncUserToSupabase } from "../utils/syncUser";
+
+// 👇 マッチング関連のインポート
+import { findBestMatch } from "../utils/matching";
+import { supabase } from "../utils/supabase";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -22,7 +26,7 @@ export const Route = createLazyFileRoute("/")({
 });
 
 // =================================================================
-// 1. DestinationPicker (テキスト入力 & 検索ボタン)
+// 1. DestinationPicker (変更なし)
 // =================================================================
 
 const Label = styled("label", {
@@ -159,7 +163,7 @@ export const DestinationPicker = ({
 };
 
 // =================================================================
-// 2. Leaflet 設定 & モーダル
+// 2. Leaflet 設定 & モーダル (変更なし)
 // =================================================================
 
 const icon = L.icon({
@@ -389,7 +393,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. TimeRangeSelector
+// 3. DepartureTimeSelector (変更なし)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -416,12 +420,20 @@ const TimeLabel = styled("label", {
     marginBottom: "8px",
   },
 });
-const TimeRangeSelector = ({
-  startTime,
-  endTime,
-  onChangeStart,
-  onChangeEnd,
-}: any) => {
+
+interface DepartureTimeSelectorProps {
+  departureTime: string;
+  tolerance: number;
+  onChangeTime: (val: string) => void;
+  onChangeTolerance: (val: number) => void;
+}
+
+const DepartureTimeSelector = ({
+  departureTime,
+  tolerance,
+  onChangeTime,
+  onChangeTolerance,
+}: DepartureTimeSelectorProps) => {
   const timeOptions = useMemo(() => {
     const options = [];
     for (let h = 0; h < 24; h++) {
@@ -433,30 +445,36 @@ const TimeRangeSelector = ({
     }
     return options;
   }, []);
+
+  const toleranceOptions = [0, 15, 30, 45, 60, 90, 120];
+
   return (
     <Flex gap="4" width="100%">
+      {/* 出発時刻 */}
       <Box flex="1">
-        <TimeLabel>開始時刻</TimeLabel>
+        <TimeLabel>出発希望時刻</TimeLabel>
         <Select
-          value={startTime}
-          onChange={(e) => onChangeStart(e.target.value)}
+          value={departureTime}
+          onChange={(e) => onChangeTime(e.target.value)}
         >
           {timeOptions.map((t) => (
-            <option key={`s-${t}`} value={t}>
+            <option key={`t-${t}`} value={t}>
               {t}
             </option>
           ))}
         </Select>
       </Box>
-      <Box display="flex" alignItems="center" paddingTop="24px" color="#999">
-        ～
-      </Box>
+
+      {/* 許容範囲 */}
       <Box flex="1">
-        <TimeLabel>終了時刻</TimeLabel>
-        <Select value={endTime} onChange={(e) => onChangeEnd(e.target.value)}>
-          {timeOptions.map((t) => (
-            <option key={`e-${t}`} value={t}>
-              {t}
+        <TimeLabel>許容範囲 (前後)</TimeLabel>
+        <Select
+          value={tolerance}
+          onChange={(e) => onChangeTolerance(Number(e.target.value))}
+        >
+          {toleranceOptions.map((m) => (
+            <option key={`tol-${m}`} value={m}>
+              {m === 0 ? "指定時刻のみ" : `± ${m} 分`}
             </option>
           ))}
         </Select>
@@ -466,22 +484,25 @@ const TimeRangeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック) - レイアウト調整版
+// 4. メイン画面 (検索＆登録ロジック) - ページ遷移追加版
 // =================================================================
 function RegistrationScreen() {
-  // 👇 追加: Clerkのユーザー情報を取得してSupabaseに同期する処理
   const { user, isLoaded } = useUser();
+  const navigate = useNavigate(); // 👈 ナビゲーション機能
 
   useEffect(() => {
     if (isLoaded && user) {
-      // 画面読み込み時にユーザー同期を実行
       syncUserToSupabase(user);
     }
   }, [isLoaded, user]);
-  // 👆 追加ここまで
 
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [targetDate, setTargetDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+
+  const [departureTime, setDepartureTime] = useState("09:00");
+  const [tolerance, setTolerance] = useState(30);
+
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [targetField, setTargetField] = useState<
     "departure" | "destination" | null
@@ -558,7 +579,8 @@ function RegistrationScreen() {
     return null;
   };
 
-  const handleRegister = () => {
+  // 👇 登録＆マッチング実行ボタン (ページ遷移追加)
+  const handleRegister = async () => {
     if (!departureName || !destinationName) {
       alert("出発地と目的地を入力してください");
       return;
@@ -569,28 +591,106 @@ function RegistrationScreen() {
       );
       return;
     }
-    console.log("登録データ:", {
+
+    if (!user) {
+      alert("サインインしてください");
+      return;
+    }
+
+    // 1. マッチング用のリクエストデータを作成
+    const requestData = {
       departure: { name: departureName, ...departureCoords },
       destination: { name: destinationName, ...destinationCoords },
-      startTime,
-      endTime,
-    });
-    alert("登録が完了しました！(モック)");
+      targetDate,
+      departureTime,
+      tolerance,
+    };
+
+    console.log("マッチング開始...", requestData);
+
+    try {
+      // 2. マッチングアルゴリズムを実行
+      const result = await findBestMatch(requestData, user.id);
+
+      if (result.isMatch) {
+        // --- パターンB: マッチング成立 ---
+        const partnerName =
+          result.partnerReservation.user?.nickname || "ユーザー";
+        if (
+          confirm(
+            `✨ マッチング候補が見つかりました！\n\n` +
+              `日付: ${result.partnerReservation.target_date}\n` +
+              `相手: ${partnerName} さん\n` +
+              `相乗りスコア: ${Math.floor((result.score || 0) * 100)}点\n` +
+              `------------------\n` +
+              `この人と相乗りしますか？`,
+          )
+        ) {
+          // OKなら成立
+          alert("マッチング成立！(モック)");
+          // 👇 履歴ページへ移動 (成立時は履歴へ)
+          navigate({ to: "/matching-history" });
+        } else {
+          // 拒否なら新規予約として登録
+          await saveNewReservation(requestData, user.id);
+          // 👇 マイページへ移動
+          navigate({ to: "/mypage" });
+        }
+      } else {
+        // --- パターンA: マッチングなし ---
+        console.log("マッチングなし:", result.message);
+        await saveNewReservation(requestData, user.id);
+
+        // 👇 マイページへ移動 (待機状態を確認させる)
+        navigate({ to: "/mypage" });
+      }
+    } catch (e) {
+      console.error("Error:", e);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // 予約を新規登録するヘルパー関数
+  const saveNewReservation = async (req: any, userId: string) => {
+    try {
+      const { error } = await supabase.from("reservations").insert([
+        {
+          user_id: userId,
+          departure_location: req.departure.name,
+          departure_lat: req.departure.lat,
+          departure_lng: req.departure.lng,
+          destination_location: req.destination.name,
+          destination_lat: req.destination.lat,
+          destination_lng: req.destination.lng,
+          target_date: req.targetDate,
+          start_time: req.departureTime,
+          tolerance: req.tolerance,
+          status: "active",
+        },
+      ]);
+      if (error) {
+        throw error;
+      }
+      alert(
+        "条件に合う相手がいなかったため、\n新規の予約として登録しました。\n(マイページで待機リストを確認できます)",
+      );
+    } catch (e: any) {
+      alert("保存に失敗しました: " + e.message);
+    }
   };
 
   return (
-    // 👇 レイアウト制御の肝部分
     <Flex
       direction="column"
       align="center"
-      justify="space-evenly" // 均等配置で画面内に収める
-      height="calc(100dvh - 74px)" // ヘッダー分(約74px)を引いてスクロール回避
+      justify="space-evenly"
+      height="calc(100dvh - 74px)"
       width="100%"
       maxWidth="400px"
       mx="auto"
       px="4"
       pb="4"
-      overflow="hidden" // はみ出し防止
+      overflow="hidden"
     >
       <Box width="100%">
         <h1
@@ -626,12 +726,30 @@ function RegistrationScreen() {
           />
         </Box>
 
+        <Box mb="2">
+          <TimeLabel>日付</TimeLabel>
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "16px",
+              borderRadius: "8px",
+              border: "1px solid #ccc",
+              backgroundColor: "white",
+              outline: "none",
+            }}
+          />
+        </Box>
+
         <Box>
-          <TimeRangeSelector
-            startTime={startTime}
-            endTime={endTime}
-            onChangeStart={setStartTime}
-            onChangeEnd={setEndTime}
+          <DepartureTimeSelector
+            departureTime={departureTime}
+            tolerance={tolerance}
+            onChangeTime={setDepartureTime}
+            onChangeTolerance={setTolerance}
           />
         </Box>
       </Box>

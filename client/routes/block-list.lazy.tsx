@@ -1,7 +1,9 @@
+import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "../utils/supabase";
 
 export const Route = createLazyFileRoute("/block-list")({
   component: BlockListPage,
@@ -18,18 +20,46 @@ type BlockedUser = {
 };
 
 function BlockListPage() {
+  const { user: currentUser, isLoaded } = useUser(); // Clerkユーザー取得
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<BlockedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 画面表示時にAPIから一覧を取得
+  // 画面表示時にSupabaseから一覧を取得
   useEffect(() => {
     const fetchBlockedUsers = async () => {
+      if (!isLoaded || !currentUser) return;
+
       try {
-        const res = await fetch("/api/block-list");
-        if (res.ok) {
-          const data = await res.json();
-          setBlockedUsers(data);
+        // blocksテーブルから、自分がブロックしている相手(blocked_id)の情報を取得
+        // usersテーブルを結合(join)して相手の名前やアイコンを取得する
+        const { data, error } = await supabase
+          .from("blocks")
+          .select(`
+            created_at,
+            blocked:users!blocked_id (
+              id,
+              nickname,
+              icon_image_url,
+              bio,
+              habitual_route
+            )
+          `)
+          .eq("blocker_id", currentUser.id); // 自分がブロックしたデータのみ
+
+        if (error) throw error;
+
+        if (data) {
+          // DBのデータを画面用の型に変換
+          const formattedData: BlockedUser[] = data.map((item: any) => ({
+            id: item.blocked.id,
+            name: item.blocked.nickname || "No Name",
+            icon: item.blocked.icon_image_url,
+            blockedDate: item.created_at,
+            habitualRoute: item.blocked.habitual_route || "未設定",
+            bio: item.blocked.bio || "自己紹介はありません",
+          }));
+          setBlockedUsers(formattedData);
         }
       } catch (error) {
         console.error("Error fetching blocked users:", error);
@@ -39,26 +69,29 @@ function BlockListPage() {
     };
 
     fetchBlockedUsers();
-  }, []);
+  }, [isLoaded, currentUser]);
 
   // ブロック解除ボタンの処理
-  const handleUnblock = async (userId: string, userName: string) => {
-    if (confirm(`${userName}さんのブロックを解除しますか？`)) {
+  const handleUnblock = async (targetUserId: string, targetUserName: string) => {
+    if (!currentUser) return;
+    
+    if (confirm(`${targetUserName}さんのブロックを解除しますか？`)) {
       try {
-        // APIを叩いて削除
-        const res = await fetch(`/api/block-list?targetId=${userId}`, {
-          method: "DELETE",
-        });
+        // Supabaseから削除
+        const { error } = await supabase
+          .from("blocks")
+          .delete()
+          .eq("blocker_id", currentUser.id)
+          .eq("blocked_id", targetUserId);
 
-        if (res.ok) {
-          // 成功したら画面のリストからも消す
-          setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
-          alert("ブロックを解除しました");
-        } else {
-          alert("解除に失敗しました");
-        }
+        if (error) throw error;
+
+        // 成功したら画面のリストからも消す
+        setBlockedUsers((prev) => prev.filter((user) => user.id !== targetUserId));
+        alert("ブロックを解除しました");
       } catch (error) {
         console.error("Error unblocking user:", error);
+        alert("解除に失敗しました");
       }
     }
   };
@@ -81,14 +114,12 @@ function BlockListPage() {
         mx="auto"
         p="4"
       >
-        {/* ヘッダー部分 */}
         <Flex alignItems="center" justifyContent="center">
           <h1 className={css({ fontSize: "xl", fontWeight: "bold" })}>
             ブロック管理
           </h1>
         </Flex>
 
-        {/* ブロックユーザーリスト */}
         <Flex direction="column" gap="4">
           {blockedUsers.length === 0 ? (
             <Box textAlign="center" color="gray.500" py="8">
@@ -109,7 +140,6 @@ function BlockListPage() {
                   boxShadow: "sm",
                 })}
               >
-                {/* ユーザー情報部分 */}
                 <Flex
                   alignItems="center"
                   gap="3"
@@ -173,7 +203,6 @@ function BlockListPage() {
         </Flex>
       </Flex>
 
-      {/* 詳細モーダル */}
       {selectedUser && (
         <BlockedUserInfoModal
           user={selectedUser}
@@ -184,7 +213,8 @@ function BlockListPage() {
   );
 }
 
-// --- 👤 ブロックユーザー詳細モーダル ---
+// (以下、BlockedUserInfoModal は変更なしのため省略。元のコードをそのまま使ってください)
+// ※もし必要なら再掲します
 function BlockedUserInfoModal({
   user,
   onClose,
