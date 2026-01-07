@@ -1,11 +1,13 @@
-// 👇 [1] Clerkの認証制御コンポーネントをインポート
+// 👇 Clerkの認証制御コンポーネント
 import { RedirectToSignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 import { Container } from "@ss/jsx";
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 
-// 👇 [2] 追加: 監視用コンポーネントをインポート
-import { DeadlineWatcher } from "../components/DeadlineWatcher";
 import { Header } from "../components/original/Header";
+
+import { BackgroundMatcher } from "../components/BackgroundMatcher";
+// 👇 【重要】監視用のコンポーネントをインポート
+import { DeadlineWatcher } from "../components/DeadlineWatcher";
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -21,8 +23,9 @@ function RootComponent() {
 
         {/* 1. ログインしている時だけ、ページの中身(Outlet)を表示 */}
         <SignedIn>
-          {/* 👇 [3] 追加: ここに置くことで、ログイン中のみ常に監視が走ります */}
-          <DeadlineWatcher />
+          {/* 👇 ここに監視コンポーネントを置くことで、ログイン中はずっと裏で動きます */}
+          <DeadlineWatcher /> {/* 締め切り時間の監視 */}
+          <BackgroundMatcher /> {/* 待機中の再マッチング(同時押し対策) */}
           <Outlet />
         </SignedIn>
 

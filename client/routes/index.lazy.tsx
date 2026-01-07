@@ -1,15 +1,11 @@
 "use client";
 
-// 👇 Clerkと同期関数
 import { useUser } from "@clerk/clerk-react";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
-import { syncUserToSupabase } from "../utils/syncUser";
-
-// 👇 マッチング関連のインポート
+import L from "leaflet";
 import { findBestMatch } from "../utils/matching";
 import { supabase } from "../utils/supabase";
-
-import L from "leaflet";
+import { syncUserToSupabase } from "../utils/syncUser";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -26,9 +22,8 @@ export const Route = createLazyFileRoute("/")({
 });
 
 // =================================================================
-// 1. DestinationPicker (変更なし)
+// 1. DestinationPicker
 // =================================================================
-
 const Label = styled("label", {
   base: {
     display: "block",
@@ -38,7 +33,6 @@ const Label = styled("label", {
     marginBottom: "8px",
   },
 });
-
 const InputContainer = styled("div", {
   base: {
     display: "flex",
@@ -55,7 +49,6 @@ const InputContainer = styled("div", {
     },
   },
 });
-
 const IconButton = styled("button", {
   base: {
     display: "flex",
@@ -69,7 +62,6 @@ const IconButton = styled("button", {
     fontSize: "18px",
   },
 });
-
 interface DestinationPickerProps {
   label?: string;
   value: string;
@@ -78,7 +70,6 @@ interface DestinationPickerProps {
   onSearch: () => void;
   onMapClick: () => void;
 }
-
 export const DestinationPicker = ({
   label = "目的地を選択",
   value,
@@ -110,13 +101,12 @@ export const DestinationPicker = ({
           type="button"
           onClick={onMapClick}
           style={{ backgroundColor: "#f0f0f0", borderRight: "1px solid #ddd" }}
-          title="地図を開く"
         >
           📍
         </IconButton>
         <input
           type="text"
-          placeholder="場所名を入力 (例: 東京駅)"
+          placeholder="場所名を入力"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -130,7 +120,6 @@ export const DestinationPicker = ({
             border: "none",
             padding: "0 12px",
             fontSize: "16px",
-            color: "#333",
             outline: "none",
             backgroundColor: "transparent",
             height: "100%",
@@ -141,31 +130,17 @@ export const DestinationPicker = ({
           type="button"
           onClick={onSearch}
           style={{ backgroundColor: "#222", color: "white" }}
-          title="検索して地図に表示"
         >
           🔍
         </IconButton>
       </InputContainer>
-      {isLocationSet && (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#666",
-            marginTop: "4px",
-            textAlign: "right",
-          }}
-        >
-          ※名前を変更しても位置情報は保持されます
-        </div>
-      )}
     </Box>
   );
 };
 
 // =================================================================
-// 2. Leaflet 設定 & モーダル (変更なし)
+// 2. Leaflet 設定 & モーダル
 // =================================================================
-
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl:
@@ -176,7 +151,6 @@ const icon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
-
 const ChangeView = ({ center }: { center: { lat: number; lng: number } }) => {
   const map = useMap();
   useEffect(() => {
@@ -184,7 +158,6 @@ const ChangeView = ({ center }: { center: { lat: number; lng: number } }) => {
   }, [center, map]);
   return null;
 };
-
 const MapClickHandler = ({ onLocationSelect }: any) => {
   useMapEvents({
     click(e) {
@@ -193,7 +166,6 @@ const MapClickHandler = ({ onLocationSelect }: any) => {
   });
   return null;
 };
-
 const ModalOverlay = styled("div", {
   base: {
     position: "fixed",
@@ -207,7 +179,6 @@ const ModalOverlay = styled("div", {
     padding: "20px",
   },
 });
-
 const ModalContent = styled("div", {
   base: {
     backgroundColor: "white",
@@ -221,7 +192,6 @@ const ModalContent = styled("div", {
     animation: "fadeIn 0.2s ease-out",
   },
 });
-
 const MapModal = ({
   isOpen,
   onClose,
@@ -234,19 +204,12 @@ const MapModal = ({
     lng: number;
   } | null>(null);
   const defaultCenter = { lat: 35.681236, lng: 139.767125 };
-
   useEffect(() => {
     if (isOpen) {
-      if (initialPosition) {
-        setMarkerPosition(initialPosition);
-      } else {
-        setMarkerPosition(null);
-      }
+      setMarkerPosition(initialPosition || null);
     }
   }, [isOpen, initialPosition]);
-
   const center = markerPosition || defaultCenter;
-
   const handleConfirm = async () => {
     if (!markerPosition) {
       return;
@@ -256,45 +219,19 @@ const MapModal = ({
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${markerPosition.lat}&lon=${markerPosition.lng}&zoom=18&addressdetails=1`,
       );
       const data = await res.json();
-      let smartName = "";
-      const addr = data.address || {};
-
-      if (addr.station) {
-        smartName = addr.station;
-        if (!smartName.endsWith("駅")) {
-          smartName += "駅";
-        }
-      } else if (addr.railway) {
-        smartName = addr.railway;
-        if (!smartName.endsWith("駅")) {
-          smartName += "駅";
-        }
-      } else if (addr.amenity) {
-        smartName = addr.amenity;
-      } else if (addr.building) {
-        smartName = addr.building;
-      }
-
-      if (!smartName) {
-        const fullAddress = data.display_name || "住所不明";
-        smartName = fullAddress.split(",")[0].trim();
-      }
-
       onSelectLocation({
-        address: smartName,
+        address: data.display_name?.split(",")[0] || "住所不明",
         lat: markerPosition.lat,
         lng: markerPosition.lng,
       });
       onClose();
     } catch (error) {
-      alert("住所情報の取得に失敗しました");
+      alert("住所取得失敗");
     }
   };
-
   if (!isOpen) {
     return null;
   }
-
   return (
     <ModalOverlay>
       <ModalContent onClick={(e) => e.stopPropagation()}>
@@ -304,18 +241,12 @@ const MapModal = ({
           align="center"
           justify="space-between"
         >
-          <Box fontWeight="bold" fontSize="lg" color="#333">
+          <Box fontWeight="bold" fontSize="lg">
             {title || "場所を選択"}
           </Box>
           <button
             onClick={onClose}
-            style={{
-              fontSize: "20px",
-              cursor: "pointer",
-              background: "none",
-              border: "none",
-              color: "#999",
-            }}
+            style={{ fontSize: "20px", background: "none", border: "none" }}
           >
             ✕
           </button>
@@ -327,51 +258,27 @@ const MapModal = ({
             style={{ height: "100%", width: "100%" }}
           >
             <TileLayer
-              attribution="&copy; OpenStreetMap contributors"
+              attribution="&copy; OpenStreetMap"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <ChangeView center={center} />
             <MapClickHandler onLocationSelect={setMarkerPosition} />
             {markerPosition && <Marker position={markerPosition} icon={icon} />}
           </MapContainer>
-          {!markerPosition && (
-            <Box
-              position="absolute"
-              top="10px"
-              left="50%"
-              transform="translateX(-50%)"
-              bg="rgba(255,255,255,0.9)"
-              px="3"
-              py="1"
-              borderRadius="20px"
-              fontSize="12px"
-              fontWeight="bold"
-              color="#555"
-              zIndex={1000}
-              pointerEvents="none"
-            >
-              地図をタップしてピンを刺してください
-            </Box>
-          )}
         </Box>
         <Flex p="4" justify="flex-end" gap="3" bg="#fafafa">
           <button
-            type="button"
             onClick={onClose}
             style={{
               padding: "10px 20px",
               borderRadius: "8px",
               background: "white",
               border: "1px solid #ddd",
-              cursor: "pointer",
-              fontWeight: "bold",
-              color: "#666",
             }}
           >
             キャンセル
           </button>
           <button
-            type="button"
             onClick={handleConfirm}
             disabled={!markerPosition}
             style={{
@@ -380,8 +287,6 @@ const MapModal = ({
               border: "none",
               background: markerPosition ? "#222" : "#ccc",
               color: "white",
-              cursor: markerPosition ? "pointer" : "not-allowed",
-              fontWeight: "bold",
             }}
           >
             決定
@@ -393,7 +298,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. DepartureTimeSelector (変更なし)
+// 3. DepartureTimeSelector
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -403,12 +308,7 @@ const Select = styled("select", {
     borderRadius: "8px",
     border: "1px solid #ccc",
     backgroundColor: "white",
-    cursor: "pointer",
     appearance: "none",
-    backgroundImage:
-      'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%208l5%205%205-5%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E")',
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 12px center",
   },
 });
 const TimeLabel = styled("label", {
@@ -420,20 +320,12 @@ const TimeLabel = styled("label", {
     marginBottom: "8px",
   },
 });
-
-interface DepartureTimeSelectorProps {
-  departureTime: string;
-  tolerance: number;
-  onChangeTime: (val: string) => void;
-  onChangeTolerance: (val: number) => void;
-}
-
 const DepartureTimeSelector = ({
   departureTime,
   tolerance,
   onChangeTime,
   onChangeTolerance,
-}: DepartureTimeSelectorProps) => {
+}: any) => {
   const timeOptions = useMemo(() => {
     const options = [];
     for (let h = 0; h < 24; h++) {
@@ -445,17 +337,13 @@ const DepartureTimeSelector = ({
     }
     return options;
   }, []);
-
-  const toleranceOptions = [0, 15, 30, 45, 60, 90, 120];
-
   return (
     <Flex gap="4" width="100%">
-      {/* 出発時刻 */}
       <Box flex="1">
         <TimeLabel>出発希望時刻</TimeLabel>
         <Select
           value={departureTime}
-          onChange={(e) => onChangeTime(e.target.value)}
+          onChange={(e: any) => onChangeTime(e.target.value)}
         >
           {timeOptions.map((t) => (
             <option key={`t-${t}`} value={t}>
@@ -464,15 +352,13 @@ const DepartureTimeSelector = ({
           ))}
         </Select>
       </Box>
-
-      {/* 許容範囲 */}
       <Box flex="1">
         <TimeLabel>許容範囲 (前後)</TimeLabel>
         <Select
           value={tolerance}
-          onChange={(e) => onChangeTolerance(Number(e.target.value))}
+          onChange={(e: any) => onChangeTolerance(Number(e.target.value))}
         >
-          {toleranceOptions.map((m) => (
+          {[0, 15, 30, 45, 60, 90, 120].map((m) => (
             <option key={`tol-${m}`} value={m}>
               {m === 0 ? "指定時刻のみ" : `± ${m} 分`}
             </option>
@@ -484,11 +370,11 @@ const DepartureTimeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック) - ページ遷移追加版
+// 4. メイン画面 (ページ遷移対応版)
 // =================================================================
 function RegistrationScreen() {
   const { user, isLoaded } = useUser();
-  const navigate = useNavigate(); // 👈 ナビゲーション機能
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -499,7 +385,6 @@ function RegistrationScreen() {
   const [targetDate, setTargetDate] = useState(
     new Date().toISOString().split("T")[0],
   );
-
   const [departureTime, setDepartureTime] = useState("09:00");
   const [tolerance, setTolerance] = useState(30);
 
@@ -507,7 +392,6 @@ function RegistrationScreen() {
   const [targetField, setTargetField] = useState<
     "departure" | "destination" | null
   >(null);
-
   const [departureName, setDepartureName] = useState("");
   const [departureCoords, setDepartureCoords] = useState<{
     lat: number;
@@ -523,81 +407,63 @@ function RegistrationScreen() {
     setTargetField(field);
     setIsMapOpen(true);
   };
-
-  const handleSearch = async (
-    field: "departure" | "destination",
-    query: string,
-  ) => {
+  const handleSearch = async (field: any, query: any) => {
     if (!query) {
       return;
     }
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query,
-        )}&limit=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
       );
       const data = await res.json();
       if (data && data.length > 0) {
-        const result = data[0];
-        const lat = Number.parseFloat(result.lat);
-        const lng = Number.parseFloat(result.lon);
-
+        const { lat, lon } = data[0];
         if (field === "departure") {
-          setDepartureCoords({ lat, lng });
+          setDepartureCoords({
+            lat: Number.parseFloat(lat),
+            lng: Number.parseFloat(lon),
+          });
         } else {
-          setDestinationCoords({ lat, lng });
+          setDestinationCoords({
+            lat: Number.parseFloat(lat),
+            lng: Number.parseFloat(lon),
+          });
         }
         setTargetField(field);
         setIsMapOpen(true);
       } else {
         alert("場所が見つかりませんでした。");
       }
-    } catch (error) {
+    } catch {
       alert("検索エラー");
     }
   };
-
   const handleLocationSelect = (data: any) => {
     if (targetField === "departure") {
       setDepartureName(data.address);
       setDepartureCoords({ lat: data.lat, lng: data.lng });
-    } else if (targetField === "destination") {
+    } else {
       setDestinationName(data.address);
       setDestinationCoords({ lat: data.lat, lng: data.lng });
     }
     setTargetField(null);
   };
-
   const getCurrentModalCoords = () => {
-    if (targetField === "departure") {
-      return departureCoords;
-    }
-    if (targetField === "destination") {
-      return destinationCoords;
-    }
-    return null;
+    return targetField === "departure" ? departureCoords : destinationCoords;
   };
 
-  // 👇 登録＆マッチング実行ボタン (ページ遷移追加)
+  // 👇 登録＆マッチング実行ボタン
   const handleRegister = async () => {
     if (!departureName || !destinationName) {
-      alert("出発地と目的地を入力してください");
-      return;
+      return alert("場所を入力してください");
     }
     if (!departureCoords || !destinationCoords) {
-      alert(
-        "位置情報が設定されていません。\n地図ボタン「📍」または検索ボタン「🔍」で場所を確定させてください。",
-      );
-      return;
+      return alert("位置情報を設定してください");
     }
-
     if (!user) {
-      alert("サインインしてください");
-      return;
+      return alert("サインインしてください");
     }
 
-    // 1. マッチング用のリクエストデータを作成
     const requestData = {
       departure: { name: departureName, ...departureCoords },
       destination: { name: destinationName, ...destinationCoords },
@@ -609,39 +475,22 @@ function RegistrationScreen() {
     console.log("マッチング開始...", requestData);
 
     try {
-      // 2. マッチングアルゴリズムを実行
       const result = await findBestMatch(requestData, user.id);
 
       if (result.isMatch) {
-        // --- パターンB: マッチング成立 ---
-        const partnerName =
-          result.partnerReservation.user?.nickname || "ユーザー";
-        if (
-          confirm(
-            `✨ マッチング候補が見つかりました！\n\n` +
-              `日付: ${result.partnerReservation.target_date}\n` +
-              `相手: ${partnerName} さん\n` +
-              `相乗りスコア: ${Math.floor((result.score || 0) * 100)}点\n` +
-              `------------------\n` +
-              `この人と相乗りしますか？`,
-          )
-        ) {
-          // OKなら成立
-          alert("マッチング成立！(モック)");
-          // 👇 履歴ページへ移動 (成立時は履歴へ)
-          navigate({ to: "/matching-history" });
-        } else {
-          // 拒否なら新規予約として登録
-          await saveNewReservation(requestData, user.id);
-          // 👇 マイページへ移動
-          navigate({ to: "/mypage" });
-        }
+        // ✅ Pattern B: マッチング成立
+        // 提案ページへデータを渡して移動
+        navigate({
+          to: "/match-proposal",
+          state: {
+            proposal: result,
+            requestData: requestData,
+          },
+        });
       } else {
-        // --- パターンA: マッチングなし ---
+        // Pattern A: マッチングなし
         console.log("マッチングなし:", result.message);
         await saveNewReservation(requestData, user.id);
-
-        // 👇 マイページへ移動 (待機状態を確認させる)
         navigate({ to: "/mypage" });
       }
     } catch (e) {
@@ -650,7 +499,6 @@ function RegistrationScreen() {
     }
   };
 
-  // 予約を新規登録するヘルパー関数
   const saveNewReservation = async (req: any, userId: string) => {
     try {
       const { error } = await supabase.from("reservations").insert([
@@ -703,7 +551,6 @@ function RegistrationScreen() {
         >
           移動情報を登録する
         </h1>
-
         <Box mb="4">
           <DestinationPicker
             label="出発地"
@@ -714,7 +561,6 @@ function RegistrationScreen() {
             onSearch={() => handleSearch("departure", departureName)}
           />
         </Box>
-
         <Box mb="4">
           <DestinationPicker
             label="目的地"
@@ -725,7 +571,6 @@ function RegistrationScreen() {
             onSearch={() => handleSearch("destination", destinationName)}
           />
         </Box>
-
         <Box mb="2">
           <TimeLabel>日付</TimeLabel>
           <input
@@ -738,12 +583,10 @@ function RegistrationScreen() {
               fontSize: "16px",
               borderRadius: "8px",
               border: "1px solid #ccc",
-              backgroundColor: "white",
               outline: "none",
             }}
           />
         </Box>
-
         <Box>
           <DepartureTimeSelector
             departureTime={departureTime}

@@ -1,7 +1,9 @@
+"use client";
+
 import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { Link, createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "../utils/supabase";
 
@@ -9,402 +11,225 @@ export const Route = createLazyFileRoute("/matching-history")({
   component: MatchingHistoryPage,
 });
 
-// データ型の定義
 type HistoryItem = {
-  id: number; // グループIDなどを便宜的に使用
-  date: string;
-  partner: string;
-  partnerId: string; // ブロック用にIDを持たせる
-  partnerIcon: string;
-  route: string;
-  status: string;
-  habitualRoute: string;
-  bio: string;
-  isBlocked: boolean;
+  id: number;
+  target_date: string;
+  start_time: string;
+  departure_location: string;
+  destination_location: string;
+  matched_at: string;
+  route_info?: any;
+  partner?: {
+    nickname: string;
+    username?: string;
+    icon_image_url: string;
+  };
+};
+
+// 日時が過去かどうかを判定するヘルパー関数
+const isPast = (dateStr: string, timeStr: string) => {
+  if (!dateStr || !timeStr) {
+    return false;
+  }
+  const target = new Date(`${dateStr}T${timeStr}`);
+  const now = new Date();
+  return target < now;
 };
 
 function MatchingHistoryPage() {
-  const { user: currentUser, isLoaded } = useUser();
-  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
-  const [selectedPartner, setSelectedPartner] = useState<HistoryItem | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoaded } = useUser();
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // 画面表示時にSupabaseからデータを取得
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (!isLoaded || !currentUser) {
-        return;
-      }
-
-      try {
-        // 1. まず、自分が参加しているグループのIDを取得
-        const { data: myParticipations, error: myError } = await supabase
-          .from("ride_group_participants")
-          .select("group_id, reservation:reservations(destination_location)") // 予約情報から目的地などを取得
-          .eq("user_id", currentUser.id);
-
-        if (myError) {
-          throw myError;
-        }
-
-        if (!myParticipations || myParticipations.length === 0) {
-          setHistoryList([]);
-          return;
-        }
-
-        const myGroupIds = myParticipations.map((p) => p.group_id);
-
-        // 2. そのグループに参加している「自分以外」のユーザーを取得
-        const { data: partners, error: partnerError } = await supabase
-          .from("ride_group_participants")
-          .select(`
-            group_id,
-            user:users (
-              id, nickname, icon_image_url, bio, habitual_route
-            ),
-            group:ride_groups (
-              created_at, status
-            )
-          `)
-          .in("group_id", myGroupIds)
-          .neq("user_id", currentUser.id); // 自分を除外
-
-        if (partnerError) {
-          throw partnerError;
-        }
-
-        // 3. データを整形
-        if (partners) {
-          const formattedData: HistoryItem[] = partners.map((item: any) => {
-            // 自分の参加情報からルート名（目的地）を探す（簡易的）
-            const myInfo = myParticipations.find(
-              (p) => p.group_id === item.group_id,
-            );
-            const routeName = myInfo?.reservation?.destination_location
-              ? `${myInfo.reservation.destination_location} への相乗り`
-              : "詳細不明なルート";
-
-            return {
-              id: item.group_id, // グループIDをキーにする
-              date: item.group.created_at,
-              partner: item.user.nickname || "No Name",
-              partnerId: item.user.id,
-              partnerIcon: item.user.icon_image_url,
-              route: routeName,
-              status:
-                item.group.status === "completed" ? "completed" : "matched",
-              habitualRoute: item.user.habitual_route || "未設定",
-              bio: item.user.bio || "自己紹介はありません",
-              isBlocked: false, // 初期値（あとで判定も可能だが一旦false）
-            };
-          });
-          setHistoryList(formattedData);
-        }
-      } catch (error) {
-        console.error("Error fetching history:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [isLoaded, currentUser]);
-
-  // ブロック処理
-  const handleBlock = async (
-    groupId: number,
-    partnerId: string,
-    partnerName: string,
-  ) => {
-    if (!currentUser) {
+    if (!isLoaded || !user) {
       return;
     }
 
-    if (confirm(`${partnerName}さんをブロックしますか？`)) {
+    const fetchHistory = async () => {
       try {
-        // Supabaseのblocksテーブルに追加
-        const { error } = await supabase
-          .from("blocks")
-          .insert([{ blocker_id: currentUser.id, blocked_id: partnerId }]);
+        const { data, error } = await supabase
+          .from("reservations")
+          .select(`
+            *,
+            partner:users!partner_id ( nickname, username, icon_image_url ) 
+          `)
+          .eq("user_id", user.id)
+          .eq("status", "matched")
+          .order("target_date", { ascending: false });
 
         if (error) {
           throw error;
         }
 
-        // 画面上の表示を「ブロック済み」に更新
-        setHistoryList((prevList) =>
-          prevList.map((item) =>
-            item.id === groupId ? { ...item, isBlocked: true } : item,
-          ),
+        const formattedData = (data || []).map((item: any) => ({
+          ...item,
+          partner: item.partner,
+        }));
+
+        // 👇 ここで「過去の日時」のものだけにフィルタリング
+        const pastOnlyData = formattedData.filter((item: HistoryItem) =>
+          isPast(item.target_date, item.start_time),
         );
-        alert("ブロックしました");
-      } catch (e: any) {
-        console.error("Block error:", e);
-        alert("ブロックに失敗しました: " + e.message);
+
+        setHistory(pastOnlyData);
+      } catch (e) {
+        console.error("履歴取得エラー:", e);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    fetchHistory();
+  }, [isLoaded, user]);
+
+  const handleItemClick = (item: HistoryItem) => {
+    if (!item.route_info) {
+      alert("この履歴にはルート詳細データが保存されていません。");
+      return;
     }
+    navigate({
+      to: "/match-details",
+      state: { routeInfo: item.route_info },
+    });
   };
 
-  if (isLoading) {
-    return (
-      <Flex justify="center" p="10">
-        読み込み中...
-      </Flex>
-    );
+  if (!isLoaded) {
+    return null;
   }
 
-  // (以下、JSX部分は変更なし。そのままreturnしてください)
   return (
-    <>
-      <Flex
-        direction="column"
-        gap="6"
-        width="100%"
-        maxWidth="600px"
-        mx="auto"
-        p="4"
-      >
-        <h1
-          className={css({
-            fontSize: "xl",
-            fontWeight: "bold",
-            textAlign: "center",
-          })}
-        >
-          マッチング履歴
-        </h1>
-
-        {historyList.length === 0 ? (
-          <Box textAlign="center" color="gray.500">
-            マッチング履歴はありません
-          </Box>
-        ) : (
-          <Flex direction="column" gap="4">
-            {historyList.map((item) => (
-              <div
-                key={item.id}
-                className={css({
-                  border: "1px solid token(colors.gray.200)",
-                  borderRadius: "md",
-                  padding: "4",
-                  bg: "white",
-                  boxShadow: "sm",
-                })}
-              >
-                <Flex justifyContent="space-between" alignItems="center" mb="3">
-                  <span className={css({ fontSize: "sm", color: "gray.500" })}>
-                    {new Date(item.date).toLocaleDateString()}
-                  </span>
-                  <span
-                    className={css({
-                      fontSize: "xs",
-                      padding: "1 2",
-                      borderRadius: "full",
-                      bg:
-                        item.status === "completed" ? "green.100" : "gray.100",
-                      color:
-                        item.status === "completed" ? "green.800" : "gray.800",
-                      fontWeight: "bold",
-                    })}
-                  >
-                    {item.status}
-                  </span>
-                </Flex>
-
-                <Box fontSize="lg" fontWeight="bold" mb="4">
-                  {item.route}
-                </Box>
-
-                <hr className={css({ borderColor: "gray.200", mb: "3" })} />
-
-                <Flex alignItems="center" justifyContent="space-between">
-                  <Flex
-                    alignItems="center"
-                    gap="3"
-                    onClick={() => setSelectedPartner(item)}
-                    className={css({
-                      cursor: "pointer",
-                      transition: "opacity 0.2s",
-                      _hover: { opacity: 0.7 },
-                    })}
-                  >
-                    <img
-                      src={item.partnerIcon}
-                      alt={item.partner}
-                      className={css({
-                        width: "10",
-                        height: "10",
-                        borderRadius: "full",
-                        objectFit: "cover",
-                        bg: "gray.300",
-                      })}
-                    />
-                    <Flex direction="column">
-                      <span
-                        className={css({ fontSize: "xs", color: "gray.500" })}
-                      >
-                        相乗り相手
-                      </span>
-                      <span
-                        className={css({ fontWeight: "bold", fontSize: "sm" })}
-                      >
-                        {item.partner}
-                      </span>
-                    </Flex>
-                  </Flex>
-
-                  {item.isBlocked ? (
-                    <button
-                      type="button"
-                      disabled
-                      className={css({
-                        border: "1px solid token(colors.gray.300)",
-                        color: "gray.500",
-                        bg: "gray.100",
-                        fontSize: "xs",
-                        fontWeight: "bold",
-                        padding: "1 3",
-                        borderRadius: "sm",
-                        cursor: "not-allowed",
-                      })}
-                    >
-                      ブロック中
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBlock(item.id, item.partnerId, item.partner);
-                      }}
-                      className={css({
-                        border: "1px solid token(colors.red.500)",
-                        color: "red.500",
-                        bg: "white",
-                        fontSize: "xs",
-                        fontWeight: "bold",
-                        padding: "1 3",
-                        borderRadius: "sm",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        _hover: {
-                          bg: "red.50",
-                        },
-                      })}
-                    >
-                      ブロック
-                    </button>
-                  )}
-                </Flex>
-              </div>
-            ))}
-          </Flex>
-        )}
-      </Flex>
-
-      {selectedPartner && (
-        <PartnerInfoModal
-          partner={selectedPartner}
-          onClose={() => setSelectedPartner(null)}
-        />
-      )}
-    </>
-  );
-}
-
-// (以下、PartnerInfoModal は変更なしのため省略)
-function PartnerInfoModal({
-  partner,
-  onClose,
-}: {
-  partner: HistoryItem;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className={css({
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        bg: "rgba(0, 0, 0, 0.5)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "4",
-      })}
-      onClick={onClose}
-    >
-      <div
+    <Flex direction="column" p="4" maxWidth="600px" mx="auto" pb="20">
+      <h1
         className={css({
-          bg: "white",
-          width: "100%",
-          maxWidth: "400px",
-          borderRadius: "lg",
-          padding: "6",
-          position: "relative",
-          boxShadow: "lg",
+          fontSize: "xl",
+          fontWeight: "bold",
+          mb: "6",
+          textAlign: "center",
         })}
-        onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className={css({
-            position: "absolute",
-            top: "4",
-            right: "4",
-            fontSize: "2xl",
-            cursor: "pointer",
-            color: "gray.500",
-            bg: "transparent",
-            border: "none",
-          })}
-        >
-          ✕
-        </button>
+        過去のマッチング履歴
+      </h1>
 
-        <Flex direction="column" alignItems="center" gap="4">
-          <img
-            src={partner.partnerIcon}
-            alt={partner.partner}
+      {loading ? (
+        <Box textAlign="center" color="gray.500">
+          読み込み中...
+        </Box>
+      ) : history.length === 0 ? (
+        <Box textAlign="center" py="10" bg="gray.50" borderRadius="md">
+          <p className={css({ color: "gray.500", mb: "4" })}>
+            完了した過去の履歴はありません。
+          </p>
+          <Link
+            to="/"
             className={css({
-              width: "24",
-              height: "24",
-              borderRadius: "full",
-              objectFit: "cover",
-              bg: "gray.300",
-              border: "1px solid token(colors.gray.200)",
+              color: "primary",
+              fontWeight: "bold",
+              textDecoration: "underline",
             })}
-          />
-          <h2 className={css({ fontSize: "xl", fontWeight: "bold" })}>
-            {partner.partner}
-          </h2>
+          >
+            相乗りを探す
+          </Link>
+        </Box>
+      ) : (
+        <Flex direction="column" gap="4">
+          {history.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => handleItemClick(item)}
+              className={css({
+                border: "1px solid token(colors.gray.200)",
+                borderRadius: "lg",
+                padding: "4",
+                bg: "white",
+                boxShadow: "sm",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                _hover: {
+                  borderColor: "primary",
+                  boxShadow: "md",
+                  transform: "translateY(-2px)",
+                },
+              })}
+            >
+              <Flex
+                justifyContent="space-between"
+                alignItems="center"
+                mb="3"
+                pb="2"
+                borderBottom="1px solid #eee"
+              >
+                <Box fontSize="sm" fontWeight="bold" color="gray.600">
+                  📅 {item.target_date} {item.start_time}
+                </Box>
+                <Box
+                  fontSize="xs"
+                  color="gray.600"
+                  bg="gray.200"
+                  px="2"
+                  py="1"
+                  borderRadius="full"
+                >
+                  完了
+                </Box>
+              </Flex>
 
-          <hr className={css({ width: "100%", borderColor: "gray.200" })} />
+              <Flex alignItems="center" gap="3" mb="3">
+                <img
+                  src={
+                    item.partner?.icon_image_url ||
+                    "https://via.placeholder.com/40"
+                  }
+                  alt="Partner"
+                  className={css({
+                    width: "10",
+                    height: "10",
+                    borderRadius: "full",
+                    objectFit: "cover",
+                    border: "1px solid #ddd",
+                    filter: "grayscale(100%)", // 過去のものなので少し色を落とす演出
+                  })}
+                />
+                <Box>
+                  <div className={css({ fontSize: "xs", color: "gray.500" })}>
+                    相乗りパートナー
+                  </div>
+                  <div className={css({ fontWeight: "bold", fontSize: "md" })}>
+                    {item.partner?.username ||
+                      item.partner?.nickname ||
+                      "不明なユーザー"}
+                  </div>
+                </Box>
+              </Flex>
 
-          <Flex direction="column" width="100%" gap="4" textAlign="left">
-            <div>
-              <Box fontSize="sm" color="gray.500" mb="1">
-                習慣的な利用ルート
+              <Box bg="gray.50" p="3" borderRadius="md" fontSize="sm">
+                <Flex align="center" gap="2" mb="1">
+                  <span
+                    className={css({ color: "blue.500", fontWeight: "bold" })}
+                  >
+                    発
+                  </span>
+                  {item.departure_location}
+                </Flex>
+                <Box ml="1.5" borderLeft="2px dotted #ccc" h="16px" my="1" />
+                <Flex align="center" gap="2">
+                  <span
+                    className={css({ color: "red.500", fontWeight: "bold" })}
+                  >
+                    着
+                  </span>
+                  {item.destination_location}
+                </Flex>
               </Box>
-              <Box fontWeight="medium">{partner.habitualRoute}</Box>
+
+              <Box textAlign="right" mt="2" fontSize="xs" color="gray.400">
+                タップして詳細を確認 &gt;
+              </Box>
             </div>
-            <div>
-              <Box fontSize="sm" color="gray.500" mb="1">
-                自己紹介・メモ
-              </Box>
-              <Box fontSize="sm" color="gray.700" lineHeight="1.6">
-                {partner.bio}
-              </Box>
-            </div>
-          </Flex>
+          ))}
         </Flex>
-      </div>
-    </div>
+      )}
+    </Flex>
   );
 }
