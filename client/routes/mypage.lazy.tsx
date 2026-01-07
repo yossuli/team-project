@@ -2,8 +2,11 @@
 
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
-import { Box, Flex, Grid } from "@ss/jsx";
+// 👇 変更: Grid を削除し、Flex と Box だけにしました
+import { Box, Flex } from "@ss/jsx";
 import { Link, createLazyFileRoute } from "@tanstack/react-router";
+// 👇 変更: React を明示的にインポート (型エラー防止)
+import type React from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "../utils/supabase";
 
@@ -167,7 +170,7 @@ function MyPage() {
         </button>
       </Flex>
 
-      {/* --- 2. 【新規】マッチング待ちリスト --- */}
+      {/* --- 2. マッチング待ちリスト --- */}
       <Box>
         <h2
           className={css({
@@ -205,7 +208,7 @@ function MyPage() {
                 key={res.id}
                 className={css({
                   bg: "white",
-                  border: "1px solid token(colors.blue.200)", // 青っぽい枠線で「アクティブ感」を出す
+                  border: "1px solid token(colors.blue.200)",
                   borderRadius: "lg",
                   padding: "4",
                   boxShadow: "sm",
@@ -213,7 +216,6 @@ function MyPage() {
                   overflow: "hidden",
                 })}
               >
-                {/* 左側の青いライン装飾 */}
                 <div
                   className={css({
                     position: "absolute",
@@ -294,7 +296,7 @@ function MyPage() {
 
       <hr className={css({ borderColor: "gray.200" })} />
 
-      {/* --- 3. メニューボタンエリア --- */}
+      {/* --- 3. メニューボタンエリア (Gridを使わずFlexでレイアウト) --- */}
       <Flex direction="column" gap="4">
         {/* 相乗り検索 */}
         <Link
@@ -325,13 +327,8 @@ function MyPage() {
           <MenuButton>習慣的な予約情報ページ</MenuButton>
         </Link>
 
-        {/* 登録予約情報一覧 (今回追加したリストと重複するため、ボタンは一旦削除するか、
-            「過去の履歴を含む詳細リスト」用として残すならリンク先が必要。
-            今回はマイページ上に表示したので、このボタンは実質不要かもしれません) */}
-        {/* <MenuButton>登録予約情報一覧</MenuButton> */}
-
-        <Grid gridTemplateColumns="1fr 1fr" gap="4">
-          {/* マッチング履歴 */}
+        {/* 下段の2つボタン */}
+        <Flex gap="4">
           <Link to="/matching-history" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               マッチング
@@ -340,7 +337,6 @@ function MyPage() {
             </MenuButton>
           </Link>
 
-          {/* ブロック管理 */}
           <Link to="/block-list" style={{ width: "100%" }}>
             <MenuButton style={{ height: "120px" }}>
               ブロック
@@ -348,7 +344,7 @@ function MyPage() {
               管理ページ
             </MenuButton>
           </Link>
-        </Grid>
+        </Flex>
       </Flex>
     </Flex>
   );
