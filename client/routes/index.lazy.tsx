@@ -2,7 +2,7 @@
 
 // 👇 Clerkと同期関数
 import { useUser } from "@clerk/clerk-react";
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { syncUserToSupabase } from "../utils/syncUser";
 
 // 👇 マッチング関連のインポート
@@ -484,10 +484,11 @@ const DepartureTimeSelector = ({
 };
 
 // =================================================================
-// 4. メイン画面 (検索＆登録ロジック) - 日付追加版
+// 4. メイン画面 (検索＆登録ロジック) - ページ遷移追加版
 // =================================================================
 function RegistrationScreen() {
   const { user, isLoaded } = useUser();
+  const navigate = useNavigate(); // 👈 ナビゲーション機能
 
   useEffect(() => {
     if (isLoaded && user) {
@@ -495,7 +496,6 @@ function RegistrationScreen() {
     }
   }, [isLoaded, user]);
 
-  // 👇 変更1: 日付stateを追加 (初期値: 今日)
   const [targetDate, setTargetDate] = useState(
     new Date().toISOString().split("T")[0],
   );
@@ -579,7 +579,7 @@ function RegistrationScreen() {
     return null;
   };
 
-  // 👇 登録＆マッチング実行ボタン
+  // 👇 登録＆マッチング実行ボタン (ページ遷移追加)
   const handleRegister = async () => {
     if (!departureName || !destinationName) {
       alert("出発地と目的地を入力してください");
@@ -597,11 +597,11 @@ function RegistrationScreen() {
       return;
     }
 
-    // 1. マッチング用のリクエストデータを作成 (日付を追加)
+    // 1. マッチング用のリクエストデータを作成
     const requestData = {
       departure: { name: departureName, ...departureCoords },
       destination: { name: destinationName, ...destinationCoords },
-      targetDate, // 👈 日付を追加
+      targetDate,
       departureTime,
       tolerance,
     };
@@ -626,16 +626,23 @@ function RegistrationScreen() {
               `この人と相乗りしますか？`,
           )
         ) {
-          // OKなら本来はride_groups等を作成するが、今回はモック
+          // OKなら成立
           alert("マッチング成立！(モック)");
+          // 👇 履歴ページへ移動 (成立時は履歴へ)
+          navigate({ to: "/matching-history" });
         } else {
           // 拒否なら新規予約として登録
           await saveNewReservation(requestData, user.id);
+          // 👇 マイページへ移動
+          navigate({ to: "/mypage" });
         }
       } else {
         // --- パターンA: マッチングなし ---
         console.log("マッチングなし:", result.message);
         await saveNewReservation(requestData, user.id);
+
+        // 👇 マイページへ移動 (待機状態を確認させる)
+        navigate({ to: "/mypage" });
       }
     } catch (e) {
       console.error("Error:", e);
@@ -655,7 +662,7 @@ function RegistrationScreen() {
           destination_location: req.destination.name,
           destination_lat: req.destination.lat,
           destination_lng: req.destination.lng,
-          target_date: req.targetDate, // 👈 DB保存に追加
+          target_date: req.targetDate,
           start_time: req.departureTime,
           tolerance: req.tolerance,
           status: "active",
@@ -665,7 +672,7 @@ function RegistrationScreen() {
         throw error;
       }
       alert(
-        "条件に合う相手がいなかったため、\n新規の予約として登録しました。\n(マイページで確認できます)",
+        "条件に合う相手がいなかったため、\n新規の予約として登録しました。\n(マイページで待機リストを確認できます)",
       );
     } catch (e: any) {
       alert("保存に失敗しました: " + e.message);
@@ -719,7 +726,6 @@ function RegistrationScreen() {
           />
         </Box>
 
-        {/* 👇 変更2: 日付選択コンポーネントを追加 */}
         <Box mb="2">
           <TimeLabel>日付</TimeLabel>
           <input

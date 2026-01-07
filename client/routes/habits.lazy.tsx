@@ -3,7 +3,8 @@
 import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex, styled } from "@ss/jsx";
-import { createLazyFileRoute } from "@tanstack/react-router";
+// 👇 useNavigate を追加
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
@@ -23,9 +24,8 @@ export const Route = createLazyFileRoute("/habits")({
 });
 
 // =================================================================
-// 📍 1. DestinationPicker (省略 - 変更なし)
+// 📍 1. DestinationPicker (変更なし)
 // =================================================================
-// ※ トップページと同じコンポーネント
 const Label = styled("label", {
   base: {
     display: "block",
@@ -149,7 +149,7 @@ const DestinationPicker = ({
 };
 
 // =================================================================
-// 🗺️ 2. Leaflet 設定 (省略 - 変更なし)
+// 🗺️ 2. Leaflet 設定 (変更なし)
 // =================================================================
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -287,7 +287,7 @@ const MapModal = ({
 };
 
 // =================================================================
-// 3. DepartureTimeSelector (省略 - 変更なし)
+// 3. DepartureTimeSelector (変更なし)
 // =================================================================
 const Select = styled("select", {
   base: {
@@ -647,6 +647,7 @@ function BookingConfirmModal({
     new Date().toISOString().split("T")[0],
   ); // デフォルト今日
   const [isProcessing, setIsProcessing] = useState(false);
+  const navigate = useNavigate(); // 👇 ページ遷移用のフック
 
   const handleConfirm = async () => {
     if (!habit.departureLat || !habit.destinationLat) {
@@ -688,13 +689,18 @@ function BookingConfirmModal({
           )
         ) {
           alert("マッチング成立！(モック)");
+          // 👇 成立時は履歴ページへ移動
+          navigate({ to: "/matching-history" });
         } else {
+          // 拒否時は新規予約してマイページへ
           await saveNewReservation(requestData, userId);
+          navigate({ to: "/mypage" });
         }
       } else {
-        // マッチングなし -> 新規予約
+        // マッチングなし -> 新規予約してマイページへ
         console.log("マッチングなし:", result.message);
         await saveNewReservation(requestData, userId);
+        navigate({ to: "/mypage" });
       }
       onClose(); // 閉じる
     } catch (e: any) {
@@ -724,7 +730,9 @@ function BookingConfirmModal({
     if (error) {
       throw error;
     }
-    alert("条件に合う相手がいなかったため、\n新規の予約として登録しました。");
+    alert(
+      "条件に合う相手がいなかったため、\n新規の予約として登録しました。\n(マイページで待機リストを確認できます)",
+    );
   };
 
   return (
