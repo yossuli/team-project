@@ -1,72 +1,161 @@
+import { useUser } from "@clerk/clerk-react";
 import { css } from "@ss/css";
 import { Box, Flex } from "@ss/jsx";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "../utils/supabase";
 
 export const Route = createLazyFileRoute("/matching-history")({
   component: MatchingHistoryPage,
 });
 
-// --- 🛠️ モックデータ ---
-// isBlocked フラグを追加して状態を管理できるようにします
-const initialHistoryData = [
-  {
-    id: 1,
-    date: "2023/11/01 18:00",
-    partner: "田中 太郎",
-    partnerIcon: "https://via.placeholder.com/150",
-    route: "東京駅 → 新宿駅",
-    status: "完了",
-    habitualRoute: "東京駅 ↔ 新宿駅 (平日 9:00)",
-    bio: "平日は毎日通勤で利用しています。静かに過ごすのが好きです。",
-    isBlocked: false, // ブロック状態
-  },
-  {
-    id: 2,
-    date: "2023/10/28 12:30",
-    partner: "鈴木 花子",
-    partnerIcon: "https://via.placeholder.com/150",
-    route: "渋谷駅 → 横浜駅",
-    status: "完了",
-    habitualRoute: "渋谷駅 ↔ 横浜駅 (週末)",
-    bio: "週末によく買い物に行きます。おしゃべり好きです。",
-    isBlocked: false,
-  },
-  {
-    id: 3,
-    date: "2023/10/20 09:00",
-    partner: "佐藤 次郎",
-    partnerIcon: "https://via.placeholder.com/150",
-    route: "大宮駅 → 上野駅",
-    status: "キャンセル",
-    habitualRoute: "大宮駅 ↔ 上野駅 (不定期)",
-    bio: "出張で利用することが多いです。",
-    isBlocked: false,
-  },
-];
+// データ型の定義
+type HistoryItem = {
+  id: number; // グループIDなどを便宜的に使用
+  date: string;
+  partner: string;
+  partnerId: string; // ブロック用にIDを持たせる
+  partnerIcon: string;
+  route: string;
+  status: string;
+  habitualRoute: string;
+  bio: string;
+  isBlocked: boolean;
+};
 
 function MatchingHistoryPage() {
-  // 履歴データ自体をstateで管理して、ブロック状態を更新できるようにする
-  const [historyList, setHistoryList] = useState(initialHistoryData);
+  const { user: currentUser, isLoaded } = useUser();
+  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
+  const [selectedPartner, setSelectedPartner] = useState<HistoryItem | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 選択された相手のデータ（モーダル用）
-  const [selectedPartner, setSelectedPartner] = useState<
-    (typeof initialHistoryData)[0] | null
-  >(null);
+  // 画面表示時にSupabaseからデータを取得
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!isLoaded || !currentUser) {
+        return;
+      }
 
-  // ブロックボタンを押した時の処理
-  const handleBlock = (id: number, partnerName: string) => {
+      try {
+        // 1. まず、自分が参加しているグループのIDを取得
+        const { data: myParticipations, error: myError } = await supabase
+          .from("ride_group_participants")
+          .select("group_id, reservation:reservations(destination_location)") // 予約情報から目的地などを取得
+          .eq("user_id", currentUser.id);
+
+        if (myError) {
+          throw myError;
+        }
+
+        if (!myParticipations || myParticipations.length === 0) {
+          setHistoryList([]);
+          return;
+        }
+
+        const myGroupIds = myParticipations.map((p) => p.group_id);
+
+        // 2. そのグループに参加している「自分以外」のユーザーを取得
+        const { data: partners, error: partnerError } = await supabase
+          .from("ride_group_participants")
+          .select(`
+            group_id,
+            user:users (
+              id, nickname, icon_image_url, bio, habitual_route
+            ),
+            group:ride_groups (
+              created_at, status
+            )
+          `)
+          .in("group_id", myGroupIds)
+          .neq("user_id", currentUser.id); // 自分を除外
+
+        if (partnerError) {
+          throw partnerError;
+        }
+
+        // 3. データを整形
+        if (partners) {
+          const formattedData: HistoryItem[] = partners.map((item: any) => {
+            // 自分の参加情報からルート名（目的地）を探す（簡易的）
+            const myInfo = myParticipations.find(
+              (p) => p.group_id === item.group_id,
+            );
+            const routeName = myInfo?.reservation?.destination_location
+              ? `${myInfo.reservation.destination_location} への相乗り`
+              : "詳細不明なルート";
+
+            return {
+              id: item.group_id, // グループIDをキーにする
+              date: item.group.created_at,
+              partner: item.user.nickname || "No Name",
+              partnerId: item.user.id,
+              partnerIcon: item.user.icon_image_url,
+              route: routeName,
+              status:
+                item.group.status === "completed" ? "completed" : "matched",
+              habitualRoute: item.user.habitual_route || "未設定",
+              bio: item.user.bio || "自己紹介はありません",
+              isBlocked: false, // 初期値（あとで判定も可能だが一旦false）
+            };
+          });
+          setHistoryList(formattedData);
+        }
+      } catch (error) {
+        console.error("Error fetching history:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [isLoaded, currentUser]);
+
+  // ブロック処理
+  const handleBlock = async (
+    groupId: number,
+    partnerId: string,
+    partnerName: string,
+  ) => {
+    if (!currentUser) {
+      return;
+    }
+
     if (confirm(`${partnerName}さんをブロックしますか？`)) {
-      // 該当するIDのデータの isBlocked を true に書き換える
-      setHistoryList((prevList) =>
-        prevList.map((item) =>
-          item.id === id ? { ...item, isBlocked: true } : item,
-        ),
-      );
-      // ※ページ遷移はせず、その場で更新されます
+      try {
+        // Supabaseのblocksテーブルに追加
+        const { error } = await supabase
+          .from("blocks")
+          .insert([{ blocker_id: currentUser.id, blocked_id: partnerId }]);
+
+        if (error) {
+          throw error;
+        }
+
+        // 画面上の表示を「ブロック済み」に更新
+        setHistoryList((prevList) =>
+          prevList.map((item) =>
+            item.id === groupId ? { ...item, isBlocked: true } : item,
+          ),
+        );
+        alert("ブロックしました");
+      } catch (e: any) {
+        console.error("Block error:", e);
+        alert("ブロックに失敗しました: " + e.message);
+      }
     }
   };
 
+  if (isLoading) {
+    return (
+      <Flex justify="center" p="10">
+        読み込み中...
+      </Flex>
+    );
+  }
+
+  // (以下、JSX部分は変更なし。そのままreturnしてください)
   return (
     <>
       <Flex
@@ -87,135 +176,134 @@ function MatchingHistoryPage() {
           マッチング履歴
         </h1>
 
-        {/* 履歴リスト */}
-        <Flex direction="column" gap="4">
-          {historyList.map((item) => (
-            <div
-              key={item.id}
-              className={css({
-                border: "1px solid token(colors.gray.200)",
-                borderRadius: "md",
-                padding: "4",
-                bg: "white",
-                boxShadow: "sm",
-              })}
-            >
-              {/* 上段：日付とステータス */}
-              <Flex justifyContent="space-between" alignItems="center" mb="3">
-                <span className={css({ fontSize: "sm", color: "gray.500" })}>
-                  {item.date}
-                </span>
-                <span
-                  className={css({
-                    fontSize: "xs",
-                    padding: "1 2",
-                    borderRadius: "full",
-                    bg: item.status === "完了" ? "green.100" : "red.100",
-                    color: item.status === "完了" ? "green.800" : "red.800",
-                    fontWeight: "bold",
-                  })}
-                >
-                  {item.status}
-                </span>
-              </Flex>
-
-              {/* 中段：ルート情報 */}
-              <Box fontSize="lg" fontWeight="bold" mb="4">
-                {item.route}
-              </Box>
-
-              <hr className={css({ borderColor: "gray.200", mb: "3" })} />
-
-              {/* 下段：相手の情報とブロックボタン */}
-              <Flex alignItems="center" justifyContent="space-between">
-                {/* 相手のアイコン・名前部分 */}
-                <Flex
-                  alignItems="center"
-                  gap="3"
-                  onClick={() => setSelectedPartner(item)}
-                  className={css({
-                    cursor: "pointer",
-                    transition: "opacity 0.2s",
-                    _hover: { opacity: 0.7 },
-                  })}
-                >
-                  <img
-                    src={item.partnerIcon}
-                    alt={item.partner}
+        {historyList.length === 0 ? (
+          <Box textAlign="center" color="gray.500">
+            マッチング履歴はありません
+          </Box>
+        ) : (
+          <Flex direction="column" gap="4">
+            {historyList.map((item) => (
+              <div
+                key={item.id}
+                className={css({
+                  border: "1px solid token(colors.gray.200)",
+                  borderRadius: "md",
+                  padding: "4",
+                  bg: "white",
+                  boxShadow: "sm",
+                })}
+              >
+                <Flex justifyContent="space-between" alignItems="center" mb="3">
+                  <span className={css({ fontSize: "sm", color: "gray.500" })}>
+                    {new Date(item.date).toLocaleDateString()}
+                  </span>
+                  <span
                     className={css({
-                      width: "10",
-                      height: "10",
+                      fontSize: "xs",
+                      padding: "1 2",
                       borderRadius: "full",
-                      objectFit: "cover",
-                      bg: "gray.300",
+                      bg:
+                        item.status === "completed" ? "green.100" : "gray.100",
+                      color:
+                        item.status === "completed" ? "green.800" : "gray.800",
+                      fontWeight: "bold",
                     })}
-                  />
-                  <Flex direction="column">
-                    <span
-                      className={css({ fontSize: "xs", color: "gray.500" })}
-                    >
-                      相乗り相手
-                    </span>
-                    <span
-                      className={css({ fontWeight: "bold", fontSize: "sm" })}
-                    >
-                      {item.partner}
-                    </span>
-                  </Flex>
+                  >
+                    {item.status}
+                  </span>
                 </Flex>
 
-                {/* ブロックボタン (状態によって切り替え) */}
-                {item.isBlocked ? (
-                  // ブロック中の表示
-                  <button
-                    type="button"
-                    disabled
+                <Box fontSize="lg" fontWeight="bold" mb="4">
+                  {item.route}
+                </Box>
+
+                <hr className={css({ borderColor: "gray.200", mb: "3" })} />
+
+                <Flex alignItems="center" justifyContent="space-between">
+                  <Flex
+                    alignItems="center"
+                    gap="3"
+                    onClick={() => setSelectedPartner(item)}
                     className={css({
-                      border: "1px solid token(colors.gray.300)",
-                      color: "gray.500",
-                      bg: "gray.100",
-                      fontSize: "xs",
-                      fontWeight: "bold",
-                      padding: "1 3",
-                      borderRadius: "sm",
-                      cursor: "not-allowed",
-                    })}
-                  >
-                    ブロック中
-                  </button>
-                ) : (
-                  // 通常のブロックボタン
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBlock(item.id, item.partner);
-                    }}
-                    className={css({
-                      border: "1px solid token(colors.red.500)",
-                      color: "red.500",
-                      bg: "white",
-                      fontSize: "xs",
-                      fontWeight: "bold",
-                      padding: "1 3",
-                      borderRadius: "sm",
                       cursor: "pointer",
-                      transition: "all 0.2s",
-                      _hover: {
-                        bg: "red.50",
-                      },
+                      transition: "opacity 0.2s",
+                      _hover: { opacity: 0.7 },
                     })}
                   >
-                    ブロック
-                  </button>
-                )}
-              </Flex>
-            </div>
-          ))}
-        </Flex>
+                    <img
+                      src={item.partnerIcon}
+                      alt={item.partner}
+                      className={css({
+                        width: "10",
+                        height: "10",
+                        borderRadius: "full",
+                        objectFit: "cover",
+                        bg: "gray.300",
+                      })}
+                    />
+                    <Flex direction="column">
+                      <span
+                        className={css({ fontSize: "xs", color: "gray.500" })}
+                      >
+                        相乗り相手
+                      </span>
+                      <span
+                        className={css({ fontWeight: "bold", fontSize: "sm" })}
+                      >
+                        {item.partner}
+                      </span>
+                    </Flex>
+                  </Flex>
+
+                  {item.isBlocked ? (
+                    <button
+                      type="button"
+                      disabled
+                      className={css({
+                        border: "1px solid token(colors.gray.300)",
+                        color: "gray.500",
+                        bg: "gray.100",
+                        fontSize: "xs",
+                        fontWeight: "bold",
+                        padding: "1 3",
+                        borderRadius: "sm",
+                        cursor: "not-allowed",
+                      })}
+                    >
+                      ブロック中
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBlock(item.id, item.partnerId, item.partner);
+                      }}
+                      className={css({
+                        border: "1px solid token(colors.red.500)",
+                        color: "red.500",
+                        bg: "white",
+                        fontSize: "xs",
+                        fontWeight: "bold",
+                        padding: "1 3",
+                        borderRadius: "sm",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        _hover: {
+                          bg: "red.50",
+                        },
+                      })}
+                    >
+                      ブロック
+                    </button>
+                  )}
+                </Flex>
+              </div>
+            ))}
+          </Flex>
+        )}
       </Flex>
 
-      {/* 相手情報モーダル */}
       {selectedPartner && (
         <PartnerInfoModal
           partner={selectedPartner}
@@ -226,12 +314,12 @@ function MatchingHistoryPage() {
   );
 }
 
-// --- 👤 相手情報詳細モーダル ---
+// (以下、PartnerInfoModal は変更なしのため省略)
 function PartnerInfoModal({
   partner,
   onClose,
 }: {
-  partner: (typeof initialHistoryData)[0];
+  partner: HistoryItem;
   onClose: () => void;
 }) {
   return (

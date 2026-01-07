@@ -19,7 +19,28 @@ export default defineConfig({
   },
   jsxFramework: "react",
   outdir: "./styled-system",
+
+  // 👇 [追加] ここで色を定義しました
+  theme: {
+    extend: {
+      tokens: {
+        colors: {
+          primary: { value: "#2563EB" }, // メインカラー (テックブルー)
+          secondary: { value: "#60A5FA" }, // アクセント (明るい青)
+          background: { value: "#F9FAFB" }, // アプリ背景 (薄いグレー)
+          surface: { value: "#FFFFFF" }, // カード・ヘッダー背景 (白)
+        },
+      },
+    },
+  },
+
   globalCss: {
+    // 👇 [追加] 画面全体の背景色を自動で「薄いグレー」に設定
+    body: {
+      bg: "background",
+      color: "black",
+    },
+    // ... (以下は元の設定のまま) ...
     "h1, h2, h3, h4, h5, h6": {
       my: {
         base: "3",
