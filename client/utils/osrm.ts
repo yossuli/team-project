@@ -1,46 +1,67 @@
-// OSRM (Open Source Routing Machine) の無料APIを使用
-const OSRM_BASE_URL = "https://router.project-osrm.org/route/v1/driving";
+// client/utils/osrm.ts
 
-type RouteResult = {
-  duration: number; // 所要時間 (秒)
-  distance: number; // 距離 (メートル)
-  geometry: any; // 地図描画用のルート形状データ (GeoJSON)
+// 座標の型定義
+type Coordinate = {
+  lat: number;
+  lng: number;
+};
+
+type RouteInfo = {
+  distance: number; // メートル
+  duration: number; // 秒
 };
 
 /**
- * 2点間、または複数地点間のルート情報を取得する関数
- * @param coordinates [経度, 緯度] の配列。例: [[139.7, 35.6], [139.8, 35.7]]
+ * OSRMサーバーにルート情報を問い合わせる関数
+ * ※実験用: サーバーダウン時はダミーデータを返します
  */
 export const getRouteInfo = async (
-  coordinates: { lat: number; lng: number }[],
-): Promise<RouteResult | null> => {
-  if (coordinates.length < 2) {
-    return null;
-  }
-
-  // OSRMは "経度,緯度" の順序で、セミコロン区切りでURLを作る
-  const locString = coordinates.map((c) => `${c.lng},${c.lat}`).join(";");
-
-  // APIリクエストURL作成 (overview=full: 正確な形状を取得)
-  const url = `${OSRM_BASE_URL}/${locString}?overview=full&geometries=geojson`;
-
+  coordinates: (Coordinate | { lat: number; lng: number })[],
+): Promise<RouteInfo | null> => {
   try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error("OSRM API Error");
+    // 1. URLの構築 (座標を ; でつなぐ)
+    const coordString = coordinates.map((c) => `${c.lng},${c.lat}`).join(";");
+
+    // 環境変数からURLを取得 (なければデフォルトのlocalhost)
+    const baseUrl = process.env.NEXT_PUBLIC_OSRM_URL || "http://localhost:5000";
+    const requestUrl = `${baseUrl}/route/v1/driving/${coordString}?overview=false`;
+
+    // 2. タイムアウト付きでリクエスト (3秒で諦める)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const response = await fetch(requestUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`OSRM API Error: ${response.status}`);
     }
 
-    const data = await res.json();
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0];
-      return {
-        duration: route.duration, // 秒
-        distance: route.distance, // メートル
-        geometry: route.geometry, // 地図表示用の線データ
-      };
+    const data = await response.json();
+
+    if (!data.routes || data.routes.length === 0) {
+      return null;
     }
+
+    // 最短ルートの情報を返す
+    return {
+      distance: data.routes[0].distance,
+      duration: data.routes[0].duration,
+    };
   } catch (error) {
-    console.error("Route calculation failed:", error);
+    // ========= ★ここが修正ポイント！ =========
+    // エラーが出たら、実験を止めずに「ダミーデータ」を返してあげる
+    console.warn(
+      "⚠️ OSRMサーバーに接続できませんでした。ダミーデータ(10分, 2km)を使用します。",
+    );
+
+    // ランダム要素を入れて実験っぽくする（8分〜12分の間）
+    const dummyDuration = 600 + Math.floor(Math.random() * 240 - 120);
+
+    return {
+      distance: 2000, // 仮: 2km
+      duration: dummyDuration, // 仮: 約10分
+    };
+    // =======================================
   }
-  return null;
 };

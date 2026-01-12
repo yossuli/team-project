@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
-import { findBatchMatch } from "../client/utils/batchMatching"; // Batch
+import { findBatchMatch } from "../client/utils/batchmatching"; // Batch
 import { findBestMatch } from "../client/utils/matching"; // Norun
 
 dotenv.config({ path: ".env.local" });

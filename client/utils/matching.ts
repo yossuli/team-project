@@ -1,5 +1,5 @@
-import { getRouteInfo } from "./osrm";
-import { supabase } from "./supabase";
+import { getRouteInfo } from "./osrm.ts";
+import { supabase } from "./supabase.ts";
 // --- Norun アルゴリズム設定値 (地方自治体・短距離モデル) ---
 // 1. スコア設定
 const SCORE_THRESHOLD = 0.5; // 合格ライン (50点以上で即決)
@@ -39,7 +39,7 @@ export const findBestMatch = async (
   // ---------------------------------------------------------
   const { data: candidates, error } = await supabase
     .from("reservations")
-    .select("*, user:users!user_id(nickname, username, icon_image_url)")
+    .select("*")
     .eq("status", "active")            // 待機中の人のみ
     .eq("target_date", request.targetDate) // 日付一致
     .neq("user_id", currentUserId);    // 自分以外
