@@ -23,7 +23,7 @@ model Test {
 model User {
   id              String   @id // Clerk ID or UUID
   email           String   @unique
-  passwordHash    String   @map("password_hash") // Clerkを使用するので、おそらく不要
+  passwordHash    String?  @map("password_hash") // Clerkを使用するので、おそらく不要
   nickname        String
   iconImageUrl    String?  @map("icon_image_url")
   profileIsPublic Int      @default(0) @map("profile_is_public")
