@@ -291,7 +291,7 @@ const DepartureTimeSelector = ({
           value={tolerance}
           onChange={(e: any) => onChangeTolerance(Number(e.target.value))}
         >
-          {[0, 15, 30, 45, 60, 90].map((m) => (
+          {[0, 5, 10, 15, 20, 30].map((m) => (
             <option key={m} value={m}>
               ±{m}分
             </option>
