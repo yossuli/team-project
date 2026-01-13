@@ -358,7 +358,7 @@ const DepartureTimeSelector = ({
           value={tolerance}
           onChange={(e: any) => onChangeTolerance(Number(e.target.value))}
         >
-          {[0, 15, 30, 45, 60, 90, 120].map((m) => (
+          {[0, 5, 10, 15, 20, 30].map((m) => (
             <option key={`tol-${m}`} value={m}>
               {m === 0 ? "指定時刻のみ" : `± ${m} 分`}
             </option>
@@ -382,9 +382,20 @@ function RegistrationScreen() {
     }
   }, [isLoaded, user]);
 
-  const [targetDate, setTargetDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  // ▼▼▼ 修正: 明日の日付を取得する関数 ▼▼▼
+  const getTomorrowDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // デフォルト値を「明日」に設定
+  const [targetDate, setTargetDate] = useState(getTomorrowDate());
+  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
   const [departureTime, setDepartureTime] = useState("09:00");
   const [tolerance, setTolerance] = useState(30);
 
