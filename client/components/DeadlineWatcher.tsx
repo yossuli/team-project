@@ -39,7 +39,7 @@ export const DeadlineWatcher = () => {
         // 締め切り時刻 = 出発の3時間前
         // getTime()はミリ秒なので、3 * 60 * 60 * 1000 を引く
         const deadline = new Date(
-          targetDateTime.getTime() - 3 * 60 * 60 * 1000,
+          targetDateTime.getTime() - 1 * 60 * 60 * 1000,
         );
 
         // 「現在時刻」が「締め切り」を過ぎていたらアウト
